@@ -157,28 +157,30 @@ def get_latest_issue_data(sheet_name, config):
     return numbers, issue, date_str
 
 def render_lottery_card(title, issue, date_str, numbers, config):
-    red_count = config.get("red_count", len(numbers))
-    blue_count = config.get("blue_count", 0)
-    if red_count > len(numbers):
-        red_count = len(numbers)
-        blue_count = 0
-    red_numbers = numbers[:red_count]
-    blue_numbers = numbers[red_count:red_count+blue_count] if blue_count > 0 else []
+    # ... 前面的号码提取和球生成代码不变 ...
     
-    red_balls = "".join([f'<div class="number-ball red-ball">{n}</div>' for n in red_numbers])
-    blue_balls = "".join([f'<div class="number-ball blue-ball">{n}</div>' for n in blue_numbers])
+    # 构建标题行：彩种名称 + 空格 + 期号日期（期号数字放大）
+    issue_number = str(issue) if issue else ''
+    date_display = date_str if date_str else ''
+    header_html = f'''
+    <div style="margin-bottom: 12px; line-height: 1.4;">
+        <span class="card-title">{title}</span>
+        <span> </span>
+        <span style="font-size: 0.85rem; color: #6c757d;">期号: </span>
+        <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
+        <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
+    </div>
+    '''
     
-    if title == "快乐8" and red_count == 20:
+    # 号码球容器（快乐8特殊处理）
+    if title == "快乐8" and config.get("red_count", 0) == 20:
         ball_container = f'<div class="ball-grid">{red_balls}</div>'
     else:
         ball_container = f'<div class="ball-container">{red_balls}{blue_balls}</div>'
     
     return f"""
     <div class="lottery-card">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
-            <div class="card-title" style="margin-bottom: 0;">{title}</div>
-            <div class="card-issue" style="margin-bottom: 0;">期号: {issue} | {date_str}</div>
-        </div>
+        {header_html}
         {ball_container}
     </div>
     """
