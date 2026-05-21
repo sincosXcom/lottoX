@@ -291,7 +291,7 @@ def render_all_latest():
             st.markdown(card_html, unsafe_allow_html=True)
     
     # 底部免责声明
-    st.markdown('<div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 0.8rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
