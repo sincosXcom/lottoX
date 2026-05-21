@@ -196,7 +196,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
     <div>
         <span class="card-title" style="font-size: 1.4rem; font-weight: bold; color: #1e293b;">{title}</span>
-        <span style="margin-left: 8px; font-size: 0.85rem; color: #6c757d;">期号: </span>
+        <span style="margin-left: 8px; font-size: 0.85rem; color: #6c757d;"> </span>
         <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
         <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
     </div>
