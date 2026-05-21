@@ -129,7 +129,7 @@ def verify_card_from_sheets(user_code):
     except Exception:
         return False, "验证服务异常，请稍后重试"
 
-# ================== 彩种配置（不含韩国乐透，添加排列5） ==================
+# ================== 彩种配置 ==================
 LOTTERY_CONFIG = {
     "双色球": {"sheet": "ssq", "columns": ["issue", "date", "red1","red2","red3","red4","red5","red6","blue"], "number_cols": ["red1","red2","red3","red4","red5","red6","blue"], "red_count": 6, "blue_count": 1},
     "大乐透": {"sheet": "dlt", "columns": ["issue", "date", "red1","red2","red3","red4","red5","blue1","blue2"], "number_cols": ["red1","red2","red3","red4","red5","blue1","blue2"], "red_count": 5, "blue_count": 2},
@@ -141,8 +141,8 @@ LOTTERY_CONFIG = {
     "七星彩": {"sheet": "qxc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","special"], "red_count": 6, "blue_count": 1},
 }
 
-# 顺序（每行两个，按列表顺序排列）
-DISPLAY_ORDER = ["双色球", "大乐透", "快乐8", "排列3", "福彩3D", "排列5", "七乐彩", "七星彩"]
+# 自定义显示顺序（按你的要求）
+DISPLAY_ORDER = ["大乐透", "七星彩", "排列3", "排列5", "双色球", "福彩3D", "快乐8", "七乐彩"]
 
 # ================== 最新开奖展示 ==================
 def get_latest_issue_data(sheet_name, config):
@@ -168,7 +168,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     red_balls = "".join([f'<div class="number-ball red-ball">{n}</div>' for n in red_numbers])
     blue_balls = "".join([f'<div class="number-ball blue-ball">{n}</div>' for n in blue_numbers])
     
-    # 快乐8 20个红球使用网格布局（每行10个）
+    # 快乐8特殊布局（每行10个）
     if title == "快乐8" and red_count == 20:
         ball_container = f'<div class="ball-grid">{red_balls}</div>'
     else:
@@ -192,7 +192,7 @@ def render_all_latest():
         if nums:
             data_map[name] = (nums, issue, date_str, cfg)
     
-    # 按顺序展示，每行两个
+    # 样式（增加手机适配：卡片宽度100%，号码球适当缩小）
     st.markdown("""
     <style>
     .lottery-card {
@@ -202,17 +202,17 @@ def render_all_latest():
         margin-bottom: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         border-left: 6px solid #4b6cb7;
-        height: 100%;
+        width: 100%;
     }
     .card-title {
         font-size: 1.4rem;
         font-weight: bold;
         color: #1e293b;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .card-issue {
-        font-size: 0.85rem;
-        color: #64748b;
+        font-size: 0.8rem;
+        color: #6c757d;
         margin-bottom: 12px;
     }
     .ball-container {
@@ -246,14 +246,10 @@ def render_all_latest():
     .blue-ball {
         background: linear-gradient(135deg, #3b82f6, #1e3a8a);
     }
-    /* 手机端适配：小屏幕下每个卡片占满宽度 */
+    /* 手机/平板适配 */
     @media (max-width: 768px) {
-        .stColumn {
-            width: 100% !important;
-            flex: 100% !important;
-        }
         .ball-grid {
-            grid-template-columns: repeat(10, minmax(30px, 40px));
+            grid-template-columns: repeat(10, minmax(30px, 36px));
             gap: 4px;
         }
         .number-ball {
@@ -262,19 +258,22 @@ def render_all_latest():
             line-height: 30px;
             font-size: 12px;
         }
+        .card-title {
+            font-size: 1.2rem;
+        }
+        .card-issue {
+            font-size: 0.7rem;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # 将彩种按每两个一组放入列
-    for i in range(0, len(DISPLAY_ORDER), 2):
-        cols = st.columns(2)
-        for j, name in enumerate(DISPLAY_ORDER[i:i+2]):
-            if name in data_map:
-                nums, issue, date_str, cfg = data_map[name]
-                card_html = render_lottery_card(name, issue, date_str, nums, cfg)
-                with cols[j]:
-                    st.markdown(card_html, unsafe_allow_html=True)
+    # 按顺序一行一个卡片
+    for name in DISPLAY_ORDER:
+        if name in data_map:
+            nums, issue, date_str, cfg = data_map[name]
+            card_html = render_lottery_card(name, issue, date_str, nums, cfg)
+            st.markdown(card_html, unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
@@ -330,15 +329,17 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    # 主区域：显示最新开奖
-    render_all_latest()
-    
-    # 如果 VIP 激活且点击了走势图按钮，则显示走势图（占位）
+    # 主区域：首先可能显示VIP分析内容（如果有），然后显示最新开奖结果
+    # 根据你的要求“最新开奖结果应该在vip内容下方”，这里先处理VIP分析占位
     if st.session_state.get("vip_unlocked", False) and st.session_state.get("show_trend", False):
         st.markdown("---")
         st.subheader(f"📈 {selected_vip_lottery} 走势图（开发中）")
         st.info("走势图功能即将上线，请等待后续更新。")
         st.session_state.show_trend = False
+        st.markdown("---")
+    
+    # 最新开奖结果
+    render_all_latest()
 
 if __name__ == "__main__":
     main()
