@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import time
 import uuid
@@ -10,6 +10,10 @@ from streamlit.runtime.scriptrunner import get_script_run_ctx
 from collections import Counter
 
 st.set_page_config(page_title="LOTTOX彩票中心 | LOTTOX", layout="wide")
+
+# ================== 时区处理：北京时间 ==================
+def get_beijing_time():
+    return datetime.utcnow() + timedelta(hours=8)
 
 # ================== Redis 在线人数 ==================
 APP_PREFIX = "lotto_data"
@@ -113,7 +117,7 @@ def verify_card_from_sheets(user_code):
         active_time_str = row_data[3].strip() if len(row_data) > 3 else ""
         if status == "封禁":
             return False, "授权码已被封禁"
-        now = datetime.now()
+        now = get_beijing_time()  # 使用北京时间
         if not active_time_str:
             ws.update_cell(row_num, 3, "已激活")
             ws.update_cell(row_num, 4, now.strftime("%Y-%m-%d %H:%M:%S"))
@@ -187,6 +191,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     date_display = date_str if date_str else ''
     weekday_info = LOTTERY_WEEKDAYS.get(title, "")
     
+    # 修正：所有信息在一行显示（左侧：彩种名称+期号+日期，右侧：开奖星期）
     header_html = f'''
 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
     <div>
@@ -203,11 +208,11 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 def render_all_latest():
     st.markdown("## 🎯 最新开奖结果")
     
-    # 显示今天日期和星期
-    today = datetime.now()
+    # 使用北京时间
+    now = get_beijing_time()
     weekdays_cn = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-    weekday_str = weekdays_cn[today.weekday()]
-    date_today_str = today.strftime("%Y年%m月%d日")
+    weekday_str = weekdays_cn[now.weekday()]
+    date_today_str = now.strftime("%Y年%m月%d日")
     st.markdown(f'<div style="font-size: 1.1rem; font-weight: 500; color: #1e293b; margin-bottom: 20px;">{date_today_str} {weekday_str}</div>', unsafe_allow_html=True)
     
     # 获取所有彩种最新数据
@@ -286,7 +291,7 @@ def render_all_latest():
             st.markdown(card_html, unsafe_allow_html=True)
     
     # 底部免责声明
-    st.markdown('<div style="text-align: center; font-size: 0.8rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
