@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # ================== 页面配置 ==================
-st.set_page_config(page_title="SINCOSX LOTTO 2026 彩票历史数据查询", layout="wide")
+st.set_page_config(page_title="彩票历史数据查询", layout="wide")
 
 # ================== 彩种配置 ==================
 LOTTERY_CONFIG = {
@@ -71,18 +71,19 @@ LOTTERY_CONFIG = {
 @st.cache_resource
 def get_gsheet_client():
     """获取 Google Sheets 客户端（单例）"""
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    # 只需要 Spreadsheets 权限即可，不需要 Drive API
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
     return gspread.authorize(creds)
 
-@st.cache_data(ttl=3600)  # 缓存1小时
+@st.cache_data(ttl=3600)
 def load_lottery_data(sheet_name, expected_columns):
     """从指定工作表加载数据，返回 DataFrame（期号升序）"""
     try:
         client = get_gsheet_client()
-        # 打开表格（根据你的实际表格名称修改）
-        SPREADSHEET_ID = '1qmqMpOoEldbNrIaiV83K58WEXS6y6VohQAMU-IHzGk4'
-        spreadsheet = client.open("lotto_data")  # 注意：这里是你的表格名称，不是文件名
+        # 从 Secrets 中读取表格 ID
+        spreadsheet_id = st.secrets["google"]["spreadsheet_id"]
+        spreadsheet = client.open_by_key(spreadsheet_id)
         worksheet = spreadsheet.worksheet(sheet_name)
         
         # 获取所有数据（从A1开始）
@@ -98,15 +99,16 @@ def load_lottery_data(sheet_name, expected_columns):
         df = pd.DataFrame(rows, columns=headers)
         
         # 只保留需要的列（如果实际列名与预期不完全一致，进行映射）
-        # 由于你的表格列名与 expected_columns 基本一致，我们直接取交集
         existing_cols = [col for col in expected_columns if col in df.columns]
         df = df[existing_cols]
         
         # 转换期号为数值（用于排序）
         if "issue" in df.columns:
+            # 尝试转为整数，无法转换的变成 NaN 并过滤
             df["issue"] = pd.to_numeric(df["issue"], errors="coerce")
             df = df.dropna(subset=["issue"])
-            df = df.sort_values("issue", ascending=True)  # 升序，最新一期在底部
+            # 关键：按期号升序排列，确保最新一期在最后
+            df = df.sort_values("issue", ascending=True).reset_index(drop=True)
         
         # 转换日期（可选）
         if "date" in df.columns:
@@ -124,7 +126,6 @@ def format_numbers_row(row, number_cols):
     for col in number_cols:
         if col in row and pd.notna(row[col]):
             val = str(int(row[col])) if isinstance(row[col], float) else str(row[col])
-            # 对于双色球、大乐透等，蓝球可以单独标记，这里简单拼接
             parts.append(val)
     return " ".join(parts)
 
@@ -147,11 +148,18 @@ def display_lottery_table(df, config):
         display_df.rename(columns={"issue": "期号"}, inplace=True)
     if "date" in display_df.columns:
         cols_to_show.append("日期")
-        display_df.rename(columns={"date": "日期"}, inplace=True)
+        # 将日期格式化为字符串，避免显示时间戳
+        display_df["日期"] = display_df["date"].dt.strftime("%Y-%m-%d") if pd.api.types.is_datetime64_any_dtype(display_df["date"]) else display_df["date"]
+        # 移除原始的 date 列避免重复
+        if "date" in display_df.columns:
+            display_df.drop(columns=["date"], inplace=True)
     cols_to_show.append("开奖号码")
     
-    # 如果原始数据中有特殊号码列（如蓝球），也可以单独展示，但合并列已包含
-    st.dataframe(display_df[cols_to_show], use_container_width=True, height=600)
+    # 确保列顺序
+    display_df = display_df[cols_to_show]
+    
+    # 使用 st.dataframe 展示，支持滚动和排序
+    st.dataframe(display_df, use_container_width=True, height=600)
 
 # ================== 主界面 ==================
 def main():
@@ -174,7 +182,7 @@ def main():
     st.sidebar.subheader("数据统计")
     if not df.empty:
         st.sidebar.metric("总期数", len(df))
-        latest_issue = df["issue"].max() if "issue" in df.columns else "N/A"
+        latest_issue = df["issue"].iloc[-1] if "issue" in df.columns else "N/A"
         st.sidebar.metric("最新期号", latest_issue)
     else:
         st.sidebar.info("暂无数据")
@@ -185,7 +193,8 @@ def main():
     
     # 可选：显示原始数据前几行（调试用）
     with st.expander("查看原始数据（前5行）"):
-        st.dataframe(df.head(5))
+        if not df.empty:
+            st.dataframe(df.head(5))
 
 if __name__ == "__main__":
     main()
