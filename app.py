@@ -144,6 +144,18 @@ LOTTERY_CONFIG = {
 # 自定义显示顺序（按你的要求）
 DISPLAY_ORDER = ["大乐透", "七星彩", "排列3", "排列5", "双色球", "福彩3D", "快乐8", "七乐彩"]
 
+# ================== 彩种开奖星期配置 ==================
+LOTTERY_WEEKDAYS = {
+    "大乐透": "每周一,三,六开奖",
+    "七星彩": "每周二,五,日开奖",
+    "排列3": "每天开奖",
+    "排列5": "每天开奖",
+    "双色球": "每周二,四,日开奖",
+    "福彩3D": "每天开奖",
+    "快乐8": "每天开奖",
+    "七乐彩": "每周一,三,五开奖",
+}
+
 # ================== 最新开奖展示 ==================
 def get_latest_issue_data(sheet_name, config):
     df = load_lottery_data(sheet_name, config["columns"])
@@ -173,28 +185,23 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     else:
         ball_container = f'<div class="ball-container">{red_balls}{blue_balls}</div>'
     
-    # 期号数字单独放大
     issue_number = str(issue) if issue else ''
     date_display = date_str if date_str else ''
+    weekday_info = LOTTERY_WEEKDAYS.get(title, "")
     
-    return f"""
-    <div class="lottery-card">
-        <div style="margin-bottom: 12px; line-height: 1.4;">
-            <span class="card-title">{title}</span>
-            <span> </span>
-            <span style="font-size: 0.85rem; color: #6c757d;">&nbsp;&nbsp;</span>
-            <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
-            <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
-        </div>
-        {ball_container}
+    # 标题行：彩种名称 + 开奖星期信息（右对齐）
+    header_html = f'''
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+        <span class="card-title">{title}</span>
+        <span style="font-size: 0.8rem; color: #6c757d;">{weekday_info}</span>
     </div>
-    """
-
-    # 号码球容器（快乐8特殊处理）
-    if title == "快乐8" and config.get("red_count", 0) == 20:
-        ball_container = f'<div class="ball-grid">{red_balls}</div>'
-    else:
-        ball_container = f'<div class="ball-container">{red_balls}{blue_balls}</div>'
+    <div style="margin-bottom: 12px; line-height: 1.4;">
+        <span> </span>
+        <span style="font-size: 0.85rem; color: #6c757d;">期号: </span>
+        <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
+        <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
+    </div>
+    '''
     
     return f"""
     <div class="lottery-card">
@@ -204,7 +211,18 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     """
 
 def render_all_latest():
+    # 显示标题
     st.markdown("## 🎯 最新开奖结果")
+    
+    # 获取今天的日期和星期
+    today = datetime.now()
+    weekdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+    weekday_str = weekdays[today.weekday()]
+    date_today_str = today.strftime("%Y年%m月%d日")
+    st.markdown(
+        f'<div style="font-size: 1.1rem; font-weight: 500; color: #1e293b; margin-bottom: 20px;">{date_today_str} {weekday_str}</div>',
+        unsafe_allow_html=True
+    )
     
     # 获取所有彩种的最新数据
     data_map = {}
@@ -213,7 +231,7 @@ def render_all_latest():
         if nums:
             data_map[name] = (nums, issue, date_str, cfg)
     
-    # 样式（增加手机适配：卡片宽度100%，号码球适当缩小）
+    # 样式
     st.markdown("""
     <style>
     .lottery-card {
@@ -229,11 +247,6 @@ def render_all_latest():
         font-size: 1.4rem;
         font-weight: bold;
         color: #1e293b;
-        margin-bottom: 0px;
-    }
-    .card-issue {
-        font-size: 0.8rem;
-        color: #6c757d;
         margin-bottom: 0px;
     }
     .ball-container {
@@ -282,9 +295,6 @@ def render_all_latest():
         .card-title {
             font-size: 1.2rem;
         }
-        .card-issue {
-            font-size: 0.7rem;
-        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -295,6 +305,12 @@ def render_all_latest():
             nums, issue, date_str, cfg = data_map[name]
             card_html = render_lottery_card(name, issue, date_str, nums, cfg)
             st.markdown(card_html, unsafe_allow_html=True)
+    
+    # 底部免责声明
+    st.markdown(
+        '<div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>',
+        unsafe_allow_html=True
+    )
 
 # ================== 主函数 ==================
 def main():
