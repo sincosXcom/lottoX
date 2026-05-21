@@ -7,6 +7,7 @@ import requests
 import time
 import uuid
 from streamlit.runtime.scriptrunner import get_script_run_ctx
+from collections import Counter  # 已在分析中使用，提前导入
 
 # ================== 页面配置 ==================
 st.set_page_config(page_title="彩票历史数据中心", layout="wide")
@@ -244,9 +245,6 @@ def main():
         unsafe_allow_html=True
     )
     st.sidebar.divider()
-    # 在线人数
-    st.sidebar.metric("👥 当前在线", get_online_count())
-    st.sidebar.divider()
     
     # 彩种选择
     selected_lottery = st.sidebar.selectbox("📌 选择彩种", list(LOTTERY_CONFIG.keys()))
@@ -262,6 +260,10 @@ def main():
         st.sidebar.metric("最新期号", latest_issue)
     else:
         st.sidebar.info("暂无数据")
+    
+    # 在线人数移至侧边栏最底部（文字一行）
+    st.sidebar.divider()
+    st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
     # 主区域标题
     st.title(f"{selected_lottery} 历史开奖记录")
@@ -279,10 +281,19 @@ def main():
         st.session_state.vip_days_left = 0
     
     if not st.session_state.vip_unlocked:
-        # 解锁界面
+        # 自定义浅绿色背景提示（与 happy8 样式一致）
+        st.markdown(
+            """
+            <div style="background-color:#d4edda; padding:10px 15px; border-radius:8px; border-left:4px solid #28a745; margin-bottom:15px;">
+                🔓 该区域需解锁高阶权限，请输入授权码：
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        # 同一行布局：输入框（无标签） + 按钮
         col1, col2 = st.columns([2, 1])
         with col1:
-            auth_code = st.text_input("请输入授权码", type="password", key="vip_code")
+            auth_code = st.text_input("", placeholder="请输入授权码", type="password", key="vip_code", label_visibility="collapsed")
         with col2:
             if st.button("激活 VIP", use_container_width=True):
                 ok, msg = verify_card_from_sheets(auth_code)
@@ -303,7 +314,6 @@ def main():
                 if col in df.columns:
                     all_numbers.extend(df[col].dropna().astype(int).tolist())
             if all_numbers:
-                from collections import Counter
                 counter = Counter(all_numbers)
                 top10 = counter.most_common(10)
                 st.markdown("**🔥 历史热号 TOP 10**")
