@@ -9,7 +9,7 @@ import uuid
 from streamlit.runtime.scriptrunner import get_script_run_ctx
 from collections import Counter
 
-st.set_page_config(page_title="彩票数据中心 | 最新开奖", layout="wide")
+st.set_page_config(page_title="LOTTOX彩票中心 | LOTTOX", layout="wide")
 
 # ================== Redis 在线人数 ==================
 APP_PREFIX = "lotto_data"
@@ -141,10 +141,8 @@ LOTTERY_CONFIG = {
     "七星彩": {"sheet": "qxc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","special"], "red_count": 6, "blue_count": 1},
 }
 
-# 自定义显示顺序（按你的要求）
 DISPLAY_ORDER = ["大乐透", "七星彩", "排列3", "排列5", "双色球", "福彩3D", "快乐8", "七乐彩"]
 
-# ================== 彩种开奖星期配置 ==================
 LOTTERY_WEEKDAYS = {
     "大乐透": "每周一,三,六开奖",
     "七星彩": "每周二,五,日开奖",
@@ -155,6 +153,18 @@ LOTTERY_WEEKDAYS = {
     "快乐8": "每天开奖",
     "七乐彩": "每周一,三,五开奖",
 }
+
+# ================== 最新开奖展示 ==================
+def get_latest_issue_data(sheet_name, config):
+    df = load_lottery_data(sheet_name, config["columns"])
+    if df.empty:
+        return None, None, None
+    latest = df.iloc[-1]
+    issue = latest["issue"] if "issue" in latest else None
+    date_val = latest["date"] if "date" in latest else None
+    date_str = date_val.strftime("%Y-%m-%d") if isinstance(date_val, pd.Timestamp) else str(date_val) if date_val else ""
+    numbers = [str(int(v)) if isinstance(v, float) else str(v) for v in [latest[col] for col in config["number_cols"] if col in latest] if pd.notna(v)]
+    return numbers, issue, date_str
 
 def render_lottery_card(title, issue, date_str, numbers, config):
     red_count = config.get("red_count", len(numbers))
@@ -177,7 +187,6 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     date_display = date_str if date_str else ''
     weekday_info = LOTTERY_WEEKDAYS.get(title, "")
     
-    # 构建标题行（彩种名称、开奖星期、期号和日期）
     header_html = f'''
 <div style="margin-bottom: 12px;">
     <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -191,27 +200,26 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     </div>
 </div>
 '''
-    # 合并卡片HTML
     return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
 def render_all_latest():
     st.markdown("## 🎯 最新开奖结果")
     
-    # 获取今天日期和星期
+    # 显示今天日期和星期
     today = datetime.now()
     weekdays_cn = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
     weekday_str = weekdays_cn[today.weekday()]
     date_today_str = today.strftime("%Y年%m月%d日")
     st.markdown(f'<div style="font-size: 1.1rem; font-weight: 500; color: #1e293b; margin-bottom: 20px;">{date_today_str} {weekday_str}</div>', unsafe_allow_html=True)
     
-    # 获取所有彩种的最新数据
+    # 获取所有彩种最新数据
     data_map = {}
     for name, cfg in LOTTERY_CONFIG.items():
         nums, issue, date_str = get_latest_issue_data(cfg["sheet"], cfg)
         if nums:
             data_map[name] = (nums, issue, date_str, cfg)
     
-    # CSS样式
+    # CSS
     st.markdown("""
     <style>
     .lottery-card {
@@ -280,13 +288,12 @@ def render_all_latest():
             st.markdown(card_html, unsafe_allow_html=True)
     
     # 底部免责声明
-    st.markdown('<div style="text-align: center; font-size: 1rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
     update_online_status()
     
-    # 侧边栏
     st.sidebar.title("🎰 LOTTOX 彩票")
     st.sidebar.markdown(
         f"""
@@ -305,7 +312,6 @@ def main():
     st.sidebar.info("所有彩种最新一期开奖结果")
     st.sidebar.divider()
     
-    # VIP 区域（放在侧边栏底部，在线人数上方）
     if "vip_unlocked" not in st.session_state:
         st.session_state.vip_unlocked = False
         st.session_state.vip_days_left = 0
@@ -336,8 +342,6 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    # 主区域：首先可能显示VIP分析内容（如果有），然后显示最新开奖结果
-    # 根据你的要求“最新开奖结果应该在vip内容下方”，这里先处理VIP分析占位
     if st.session_state.get("vip_unlocked", False) and st.session_state.get("show_trend", False):
         st.markdown("---")
         st.subheader(f"📈 {selected_vip_lottery} 走势图（开发中）")
@@ -345,7 +349,6 @@ def main():
         st.session_state.show_trend = False
         st.markdown("---")
     
-    # 最新开奖结果
     render_all_latest()
 
 if __name__ == "__main__":
