@@ -7,13 +7,13 @@ import requests
 import time
 import uuid
 from streamlit.runtime.scriptrunner import get_script_run_ctx
-from collections import Counter  # 已在分析中使用，提前导入
+from collections import Counter
 
 # ================== 页面配置 ==================
 st.set_page_config(page_title="彩票历史数据中心", layout="wide")
 
 # ================== Redis 在线人数（带前缀） ==================
-APP_PREFIX = "lotto_data"  # 唯一前缀，与老站点隔离
+APP_PREFIX = "lotto_data"
 
 class RedisClient:
     def __init__(self, url, token):
@@ -63,8 +63,9 @@ def update_online_status():
         uid = get_user_id()
         r.setex(f"user:{uid}", 300, time.time())
         r.sadd("online_users_set", uid)
-    except Exception as e:
-        st.sidebar.error(f"在线人数异常: {e}")
+    except Exception:
+        # 静默失败，避免干扰
+        pass
 
 def get_online_count():
     try:
@@ -142,10 +143,9 @@ def verify_card_from_sheets(user_code):
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
         client = gspread.authorize(creds)
-        spreadsheet_id = st.secrets["google"]["spreadsheet_id"]  # 使用同一个表格，需要包含 Cards 工作表
+        spreadsheet_id = st.secrets["google"]["spreadsheet_id"]
         sh = client.open_by_key(spreadsheet_id)
         ws = sh.worksheet("Cards")
-        # 使用 find 方法精确查找
         try:
             cell = ws.find(user_code, in_column=1)
         except gspread.exceptions.CellNotFound:
@@ -172,7 +172,7 @@ def verify_card_from_sheets(user_code):
                 return True, remaining
             else:
                 return False, f"授权已过期 {remaining} 天"
-    except Exception as e:
+    except Exception:
         return False, "验证服务异常，请稍后重试"
 
 # ================== 彩种配置 ==================
@@ -221,12 +221,10 @@ LOTTERY_CONFIG = {
 
 # ================== 主界面 ==================
 def main():
-    # 更新在线人数（放在页面渲染前）
     update_online_status()
     
     # 侧边栏
     st.sidebar.title("🎰 彩票数据中心")
-    # 滚动公告
     announcement = "🎯 欢迎使用彩票历史数据中心 | 数据每日更新 | VIP功能即将上线"
     st.sidebar.markdown(
         f"""
@@ -246,11 +244,9 @@ def main():
     )
     st.sidebar.divider()
     
-    # 彩种选择
     selected_lottery = st.sidebar.selectbox("📌 选择彩种", list(LOTTERY_CONFIG.keys()))
     config = LOTTERY_CONFIG[selected_lottery]
     
-    # 数据统计
     with st.spinner(f"加载 {selected_lottery} 数据..."):
         df = load_lottery_data(config["sheet"], config["columns"])
     st.sidebar.subheader("📊 数据统计")
@@ -261,18 +257,15 @@ def main():
     else:
         st.sidebar.info("暂无数据")
     
-    # 在线人数移至侧边栏最底部（文字一行）
+    # 在线人数移至侧边栏最底部
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    # 主区域标题
     st.title(f"{selected_lottery} 历史开奖记录")
     st.caption("最新一期显示在最底部")
-    
-    # 显示表格
     display_lottery_table(df, config)
     
-    # ========== VIP 高阶功能（解锁后显示额外分析） ==========
+    # VIP 高阶分析区域
     st.markdown("---")
     st.subheader("🔓 VIP 高阶分析")
     
@@ -281,7 +274,6 @@ def main():
         st.session_state.vip_days_left = 0
     
     if not st.session_state.vip_unlocked:
-        # 自定义浅绿色背景提示（与 happy8 样式一致）
         st.markdown(
             """
             <div style="background-color:#d4edda; padding:10px 15px; border-radius:8px; border-left:4px solid #28a745; margin-bottom:15px;">
@@ -290,7 +282,6 @@ def main():
             """,
             unsafe_allow_html=True
         )
-        # 同一行布局：输入框（无标签） + 按钮
         col1, col2 = st.columns([2, 1])
         with col1:
             auth_code = st.text_input("", placeholder="请输入授权码", type="password", key="vip_code", label_visibility="collapsed")
@@ -306,9 +297,7 @@ def main():
                     st.error(msg)
     else:
         st.success(f"🌟 VIP 已激活，剩余 {st.session_state.vip_days_left} 天")
-        # 高阶分析示例：号码频次统计（基于当前彩种数据）
         if not df.empty:
-            # 统计所有号码出现次数
             all_numbers = []
             for col in config["number_cols"]:
                 if col in df.columns:
@@ -319,12 +308,14 @@ def main():
                 st.markdown("**🔥 历史热号 TOP 10**")
                 cols = st.columns(10)
                 for i, (num, cnt) in enumerate(top10):
-                    cols[i].metric(num, cnt)
+                    with cols[i]:
+                        st.metric(label=str(num), value=int(cnt))
                 st.markdown("**❄️ 历史冷号（出现次数最少）**")
                 bottom10 = counter.most_common()[-10:]
                 cols2 = st.columns(10)
                 for i, (num, cnt) in enumerate(bottom10):
-                    cols2[i].metric(num, cnt)
+                    with cols2[i]:
+                        st.metric(label=str(num), value=int(cnt))
             else:
                 st.info("无号码数据")
         else:
