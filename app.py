@@ -108,7 +108,6 @@ def load_lottery_data(sheet_name, expected_columns):
 
 # ================== VIP 授权验证 ==================
 def verify_card_from_sheets(user_code):
-    """从 Google Sheets 的 Cards 工作表验证授权码"""
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
         creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
@@ -173,7 +172,7 @@ LOTTERY_CONFIG = {
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
         "type": "乐透",
-        "red_start": 0, "red_count": 7, "blue_start": 7, "blue_count": 1  # special 作蓝球
+        "red_start": 0, "red_count": 7, "blue_start": 7, "blue_count": 1
     },
     "韩国乐透": {
         "sheet": "klotto",
@@ -207,37 +206,46 @@ LOTTERY_CONFIG = {
 
 # ================== 最新一期展示 ==================
 def get_latest_issue_data(sheet_name, config):
-    """返回最新一期的行数据 (dict) 和期号、日期"""
+    """返回最新一期的号码列表、期号、日期字符串"""
     df = load_lottery_data(sheet_name, config["columns"])
     if df.empty:
         return None, None, None
     latest = df.iloc[-1]
     issue = latest["issue"] if "issue" in latest else None
-    date = latest["date"] if "date" in latest else None
-    # 提取号码值
+    date_val = latest["date"] if "date" in latest else None
+    if pd.isna(date_val):
+        date_str = ""
+    else:
+        if hasattr(date_val, 'strftime'):
+            date_str = date_val.strftime("%Y-%m-%d")
+        else:
+            date_str = str(date_val)
     numbers = []
     for col in config["number_cols"]:
         val = latest[col]
         if pd.notna(val):
-            numbers.append(str(int(val)) if isinstance(val, float) else str(val))
+            # 将浮点数或整数转为字符串
+            if isinstance(val, float):
+                if val.is_integer():
+                    numbers.append(str(int(val)))
+                else:
+                    numbers.append(str(val))
+            else:
+                numbers.append(str(val))
         else:
             numbers.append("?")
-    return numbers, issue, date
+    return numbers, issue, date_str
 
-def render_lottery_card(title, issue, date, numbers, config):
-    """生成一个彩种卡片，带彩色号码球"""
-    # 确定红球和蓝球范围
+def render_lottery_card(title, issue, date_str, numbers, config):
     red_count = config.get("red_count", 0)
     blue_count = config.get("blue_count", 0)
     if red_count == 0:
-        # 默认全部视为红球样式
         red_numbers = numbers
         blue_numbers = []
     else:
         red_numbers = numbers[:red_count]
         blue_numbers = numbers[red_count:red_count+blue_count] if blue_count > 0 else []
     
-    # 构建 HTML 号码球
     ball_html = ""
     for n in red_numbers:
         ball_html += f'<div class="number-ball red-ball">{n}</div>'
@@ -247,25 +255,22 @@ def render_lottery_card(title, issue, date, numbers, config):
     card = f"""
     <div class="lottery-card">
         <div class="card-title">{title}</div>
-        <div class="card-issue">期号: {issue} | {date.strftime('%Y-%m-%d') if date else ''}</div>
+        <div class="card-issue">期号: {issue} | {date_str}</div>
         <div class="ball-container">{ball_html}</div>
     </div>
     """
     return card
 
 def render_all_latest():
-    """读取所有彩种最新一期，分组展示"""
     st.markdown("## 🎯 最新开奖结果")
     
-    # 分组
     lottery_groups = {"乐透型": [], "数字型": []}
     for name, config in LOTTERY_CONFIG.items():
-        numbers, issue, date = get_latest_issue_data(config["sheet"], config)
+        numbers, issue, date_str = get_latest_issue_data(config["sheet"], config)
         if numbers is None:
             continue
-        lottery_groups[config["type"]].append((name, issue, date, numbers, config))
+        lottery_groups[config["type"]].append((name, issue, date_str, numbers, config))
     
-    # 样式
     st.markdown("""
     <style>
     .lottery-card {
@@ -315,29 +320,26 @@ def render_all_latest():
     </style>
     """, unsafe_allow_html=True)
     
-    # 展示乐透型
     if lottery_groups["乐透型"]:
         st.subheader("🎲 乐透型")
-        cols = st.columns(2)  # 每行2个卡片
-        for idx, (name, issue, date, numbers, config) in enumerate(lottery_groups["乐透型"]):
+        cols = st.columns(2)
+        for idx, (name, issue, date_str, numbers, config) in enumerate(lottery_groups["乐透型"]):
             with cols[idx % 2]:
-                card = render_lottery_card(name, issue, date, numbers, config)
+                card = render_lottery_card(name, issue, date_str, numbers, config)
                 st.markdown(card, unsafe_allow_html=True)
     
-    # 展示数字型
     if lottery_groups["数字型"]:
         st.subheader("🔢 数字型 (3D/排列3/七星彩)")
-        cols = st.columns(3)  # 每行3个卡片
-        for idx, (name, issue, date, numbers, config) in enumerate(lottery_groups["数字型"]):
+        cols = st.columns(3)
+        for idx, (name, issue, date_str, numbers, config) in enumerate(lottery_groups["数字型"]):
             with cols[idx % 3]:
-                card = render_lottery_card(name, issue, date, numbers, config)
+                card = render_lottery_card(name, issue, date_str, numbers, config)
                 st.markdown(card, unsafe_allow_html=True)
 
 # ================== 主界面 ==================
 def main():
     update_online_status()
     
-    # 侧边栏
     st.sidebar.title("🎰 彩票数据中心")
     announcement = "🎯 欢迎使用彩票数据中心 | 数据每日更新 | VIP解锁高阶分析"
     st.sidebar.markdown(
@@ -362,10 +364,8 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    # 主区域：展示所有彩种最新一期
     render_all_latest()
     
-    # ========== VIP 高阶分析（解锁后显示热冷号等） ==========
     st.markdown("---")
     st.subheader("🔓 VIP 高阶分析")
     
@@ -397,7 +397,6 @@ def main():
                     st.error(msg)
     else:
         st.success(f"🌟 VIP 已激活，剩余 {st.session_state.vip_days_left} 天")
-        # VIP 功能：可以选择彩种后展示热冷号（保留原有分析，但可改进）
         selected_lottery = st.selectbox("请选择彩种进行分析", list(LOTTERY_CONFIG.keys()))
         config = LOTTERY_CONFIG[selected_lottery]
         with st.spinner(f"加载 {selected_lottery} 数据..."):
