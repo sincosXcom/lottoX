@@ -144,63 +144,63 @@ def verify_card_from_sheets(user_code):
     except Exception:
         return False, "验证服务异常，请稍后重试"
 
-# ================== 彩种配置（已包含 type 字段） ==================
+# ================== 彩种配置（已包含 type 字段，值为 "乐透" 或 "数字型"） ==================
 LOTTERY_CONFIG = {
     "快乐8": {
         "sheet": "kl8",
         "columns": ["issue", "date"] + [f"n{i}" for i in range(1, 21)],
         "number_cols": [f"n{i}" for i in range(1, 21)],
         "type": "乐透",
-        "red_start": 0, "red_count": 20, "blue_start": -1, "blue_count": 0
+        "red_count": 20, "blue_count": 0
     },
     "双色球": {
         "sheet": "ssq",
         "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "red6", "blue"],
         "number_cols": ["red1", "red2", "red3", "red4", "red5", "red6", "blue"],
         "type": "乐透",
-        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
+        "red_count": 6, "blue_count": 1
     },
     "大乐透": {
         "sheet": "dlt",
         "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
         "number_cols": ["red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
         "type": "乐透",
-        "red_start": 0, "red_count": 5, "blue_start": 5, "blue_count": 2
+        "red_count": 5, "blue_count": 2
     },
     "七乐彩": {
         "sheet": "qlc",
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
         "type": "乐透",
-        "red_start": 0, "red_count": 7, "blue_start": 7, "blue_count": 1
+        "red_count": 7, "blue_count": 1
     },
     "韩国乐透": {
         "sheet": "klotto",
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
         "type": "乐透",
-        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
+        "red_count": 6, "blue_count": 1
     },
     "福彩3D": {
         "sheet": "sd",
         "columns": ["issue", "date", "n1", "n2", "n3"],
         "number_cols": ["n1", "n2", "n3"],
         "type": "数字型",
-        "red_start": 0, "red_count": 3, "blue_start": -1, "blue_count": 0
+        "red_count": 3, "blue_count": 0
     },
     "排列3": {
         "sheet": "p3",
         "columns": ["issue", "date", "n1", "n2", "n3"],
         "number_cols": ["n1", "n2", "n3"],
         "type": "数字型",
-        "red_start": 0, "red_count": 3, "blue_start": -1, "blue_count": 0
+        "red_count": 3, "blue_count": 0
     },
     "七星彩": {
         "sheet": "qxc",
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
         "type": "数字型",
-        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
+        "red_count": 6, "blue_count": 1
     }
 }
 
@@ -249,12 +249,13 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 
 def render_all_latest():
     st.markdown("## 🎯 最新开奖结果")
-    lottery_groups = {"乐透型": [], "数字型": []}
+    # 注意：字典键与 config["type"] 的值完全一致（"乐透" / "数字型"）
+    lottery_groups = {"乐透": [], "数字型": []}
     for name, config in LOTTERY_CONFIG.items():
         numbers, issue, date_str = get_latest_issue_data(config["sheet"], config)
         if numbers is None:
             continue
-        typ = config.get("type", "乐透")  # 默认乐透
+        typ = config["type"]   # 值为 "乐透" 或 "数字型"
         lottery_groups[typ].append((name, issue, date_str, numbers, config))
     
     st.markdown("""
@@ -306,16 +307,16 @@ def render_all_latest():
     </style>
     """, unsafe_allow_html=True)
     
-    if lottery_groups["乐透型"]:
+    if lottery_groups["乐透"]:
         st.subheader("🎲 乐透型")
         cols = st.columns(2)
-        for idx, (name, issue, date_str, numbers, config) in enumerate(lottery_groups["乐透型"]):
+        for idx, (name, issue, date_str, numbers, config) in enumerate(lottery_groups["乐透"]):
             with cols[idx % 2]:
                 card = render_lottery_card(name, issue, date_str, numbers, config)
                 st.markdown(card, unsafe_allow_html=True)
     
     if lottery_groups["数字型"]:
-        st.subheader("🔢 数字型 (3D/排列3/七星彩)")
+        st.subheader("🔢 数字型")
         cols = st.columns(3)
         for idx, (name, issue, date_str, numbers, config) in enumerate(lottery_groups["数字型"]):
             with cols[idx % 3]:
