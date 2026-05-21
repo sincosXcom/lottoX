@@ -301,12 +301,12 @@ def main():
     update_online_status()
     
     # 侧边栏
-    st.sidebar.title("🎰 彩票数据中心")
+    st.sidebar.title("🎰 LOTTOX 彩票")
     st.sidebar.markdown(
         f"""
         <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
             <div style="display:inline-block; animation: scroll-left 12s linear infinite;">
-                🎯 欢迎使用彩票数据中心 | 数据每日更新 | VIP解锁高阶分析
+                🎯 欢迎使用LOTTOX彩票中心 | 数据每日更新 | VIP解锁高阶分析
             </div>
         </div>
         <style>
@@ -316,7 +316,7 @@ def main():
     )
     st.sidebar.divider()
     st.sidebar.subheader("📊 数据统计")
-    st.sidebar.info("当前展示所有彩种最新一期开奖结果")
+    st.sidebar.info("所有彩种最新一期开奖结果")
     st.sidebar.divider()
     
     # VIP 区域（放在侧边栏底部，在线人数上方）
