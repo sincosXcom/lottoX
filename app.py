@@ -167,19 +167,28 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     
     red_balls = "".join([f'<div class="number-ball red-ball">{n}</div>' for n in red_numbers])
     blue_balls = "".join([f'<div class="number-ball blue-ball">{n}</div>' for n in blue_numbers])
-
-    # 构建标题行：彩种名称 + 空格 + 期号日期（期号数字放大）
+    
+    if title == "快乐8" and red_count == 20:
+        ball_container = f'<div class="ball-grid">{red_balls}</div>'
+    else:
+        ball_container = f'<div class="ball-container">{red_balls}{blue_balls}</div>'
+    
+    # 期号数字单独放大
     issue_number = str(issue) if issue else ''
     date_display = date_str if date_str else ''
-    header_html = f'''
-    <div style="margin-bottom: 12px; line-height: 1.4;">
-        <span class="card-title">{title}</span>
-        <span> </span>
-        <span style="font-size: 0.85rem; color: #6c757d;">期号: </span>
-        <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
-        <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
+    
+    return f"""
+    <div class="lottery-card">
+        <div style="margin-bottom: 12px; line-height: 1.4;">
+            <span class="card-title">{title}</span>
+            <span> </span>
+            <span style="font-size: 0.85rem; color: #6c757d;">期号: </span>
+            <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
+            <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
+        </div>
+        {ball_container}
     </div>
-    '''
+    """
 
     # 号码球容器（快乐8特殊处理）
     if title == "快乐8" and config.get("red_count", 0) == 20:
