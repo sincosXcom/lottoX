@@ -144,7 +144,7 @@ def verify_card_from_sheets(user_code):
     except Exception:
         return False, "验证服务异常，请稍后重试"
 
-# ================== 彩种配置 ==================
+# ================== 彩种配置（已包含 type 字段） ==================
 LOTTERY_CONFIG = {
     "快乐8": {
         "sheet": "kl8",
@@ -204,54 +204,40 @@ LOTTERY_CONFIG = {
     }
 }
 
-# ================== 最新一期展示 ==================
+# ================== 辅助函数 ==================
 def get_latest_issue_data(sheet_name, config):
-    """返回最新一期的号码列表、期号、日期字符串"""
     df = load_lottery_data(sheet_name, config["columns"])
     if df.empty:
         return None, None, None
     latest = df.iloc[-1]
     issue = latest["issue"] if "issue" in latest else None
     date_val = latest["date"] if "date" in latest else None
-    if pd.isna(date_val):
-        date_str = ""
+    if isinstance(date_val, pd.Timestamp):
+        date_str = date_val.strftime("%Y-%m-%d")
     else:
-        if hasattr(date_val, 'strftime'):
-            date_str = date_val.strftime("%Y-%m-%d")
-        else:
-            date_str = str(date_val)
+        date_str = str(date_val) if date_val else ""
     numbers = []
     for col in config["number_cols"]:
         val = latest[col]
         if pd.notna(val):
-            # 将浮点数或整数转为字符串
-            if isinstance(val, float):
-                if val.is_integer():
-                    numbers.append(str(int(val)))
-                else:
-                    numbers.append(str(val))
-            else:
-                numbers.append(str(val))
+            numbers.append(str(int(val)) if isinstance(val, float) else str(val))
         else:
             numbers.append("?")
     return numbers, issue, date_str
 
 def render_lottery_card(title, issue, date_str, numbers, config):
-    red_count = config.get("red_count", 0)
+    red_count = config.get("red_count", len(numbers))
     blue_count = config.get("blue_count", 0)
-    if red_count == 0:
-        red_numbers = numbers
-        blue_numbers = []
-    else:
-        red_numbers = numbers[:red_count]
-        blue_numbers = numbers[red_count:red_count+blue_count] if blue_count > 0 else []
-    
+    if red_count > len(numbers):
+        red_count = len(numbers)
+        blue_count = 0
+    red_numbers = numbers[:red_count]
+    blue_numbers = numbers[red_count:red_count+blue_count] if blue_count > 0 else []
     ball_html = ""
     for n in red_numbers:
         ball_html += f'<div class="number-ball red-ball">{n}</div>'
     for n in blue_numbers:
         ball_html += f'<div class="number-ball blue-ball">{n}</div>'
-    
     card = f"""
     <div class="lottery-card">
         <div class="card-title">{title}</div>
@@ -263,13 +249,13 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 
 def render_all_latest():
     st.markdown("## 🎯 最新开奖结果")
-    
     lottery_groups = {"乐透型": [], "数字型": []}
     for name, config in LOTTERY_CONFIG.items():
         numbers, issue, date_str = get_latest_issue_data(config["sheet"], config)
         if numbers is None:
             continue
-        lottery_groups[config["type"]].append((name, issue, date_str, numbers, config))
+        typ = config.get("type", "乐透")  # 默认乐透
+        lottery_groups[typ].append((name, issue, date_str, numbers, config))
     
     st.markdown("""
     <style>
