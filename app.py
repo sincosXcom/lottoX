@@ -168,7 +168,6 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     red_balls = "".join([f'<div class="number-ball red-ball">{n}</div>' for n in red_numbers])
     blue_balls = "".join([f'<div class="number-ball blue-ball">{n}</div>' for n in blue_numbers])
     
-    # 快乐8特殊布局（每行10个）
     if title == "快乐8" and red_count == 20:
         ball_container = f'<div class="ball-grid">{red_balls}</div>'
     else:
@@ -176,8 +175,10 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     
     return f"""
     <div class="lottery-card">
-        <div class="card-title">{title}</div>
-        <div class="card-issue">期号: {issue} | {date_str}</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+            <div class="card-title" style="margin-bottom: 0;">{title}</div>
+            <div class="card-issue" style="margin-bottom: 0;">期号: {issue} | {date_str}</div>
+        </div>
         {ball_container}
     </div>
     """
@@ -208,12 +209,12 @@ def render_all_latest():
         font-size: 1.4rem;
         font-weight: bold;
         color: #1e293b;
-        margin-bottom: 4px;
+        margin-bottom: 0px;
     }
     .card-issue {
         font-size: 0.8rem;
         color: #6c757d;
-        margin-bottom: 12px;
+        margin-bottom: 0px;
     }
     .ball-container {
         display: flex;
