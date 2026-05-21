@@ -81,6 +81,7 @@ def load_lottery_data(sheet_name, expected_columns):
     try:
         client = get_gsheet_client()
         # 打开表格（根据你的实际表格名称修改）
+        SPREADSHEET_ID = '1qmqMpOoEldbNrIaiV83K58WEXS6y6VohQAMU-IHzGk4'
         spreadsheet = client.open("lotto_data")  # 注意：这里是你的表格名称，不是文件名
         worksheet = spreadsheet.worksheet(sheet_name)
         
