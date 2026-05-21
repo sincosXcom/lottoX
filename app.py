@@ -156,18 +156,6 @@ LOTTERY_WEEKDAYS = {
     "七乐彩": "每周一,三,五开奖",
 }
 
-# ================== 最新开奖展示 ==================
-def get_latest_issue_data(sheet_name, config):
-    df = load_lottery_data(sheet_name, config["columns"])
-    if df.empty:
-        return None, None, None
-    latest = df.iloc[-1]
-    issue = latest["issue"] if "issue" in latest else None
-    date_val = latest["date"] if "date" in latest else None
-    date_str = date_val.strftime("%Y-%m-%d") if isinstance(date_val, pd.Timestamp) else str(date_val) if date_val else ""
-    numbers = [str(int(v)) if isinstance(v, float) else str(v) for v in [latest[col] for col in config["number_cols"] if col in latest] if pd.notna(v)]
-    return numbers, issue, date_str
-
 def render_lottery_card(title, issue, date_str, numbers, config):
     red_count = config.get("red_count", len(numbers))
     blue_count = config.get("blue_count", 0)
@@ -189,40 +177,32 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     date_display = date_str if date_str else ''
     weekday_info = LOTTERY_WEEKDAYS.get(title, "")
     
-    # 标题行：彩种名称 + 开奖星期信息（右对齐）
+    # 构建标题行（彩种名称、开奖星期、期号和日期）
     header_html = f'''
-    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
-        <span class="card-title">{title}</span>
+<div style="margin-bottom: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="card-title" style="font-size: 1.4rem; font-weight: bold; color: #1e293b;">{title}</span>
         <span style="font-size: 0.8rem; color: #6c757d;">{weekday_info}</span>
     </div>
-    <div style="margin-bottom: 12px; line-height: 1.4;">
-        <span> </span>
+    <div style="margin-top: 4px;">
         <span style="font-size: 0.85rem; color: #6c757d;">期号: </span>
         <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
         <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
     </div>
-    '''
-    
-    return f"""
-    <div class="lottery-card">
-        {header_html}
-        {ball_container}
-    </div>
-    """
+</div>
+'''
+    # 合并卡片HTML
+    return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
 def render_all_latest():
-    # 显示标题
     st.markdown("## 🎯 最新开奖结果")
     
-    # 获取今天的日期和星期
+    # 获取今天日期和星期
     today = datetime.now()
-    weekdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-    weekday_str = weekdays[today.weekday()]
+    weekdays_cn = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+    weekday_str = weekdays_cn[today.weekday()]
     date_today_str = today.strftime("%Y年%m月%d日")
-    st.markdown(
-        f'<div style="font-size: 1.1rem; font-weight: 500; color: #1e293b; margin-bottom: 20px;">{date_today_str} {weekday_str}</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div style="font-size: 1.1rem; font-weight: 500; color: #1e293b; margin-bottom: 20px;">{date_today_str} {weekday_str}</div>', unsafe_allow_html=True)
     
     # 获取所有彩种的最新数据
     data_map = {}
@@ -231,7 +211,7 @@ def render_all_latest():
         if nums:
             data_map[name] = (nums, issue, date_str, cfg)
     
-    # 样式
+    # CSS样式
     st.markdown("""
     <style>
     .lottery-card {
@@ -242,12 +222,6 @@ def render_all_latest():
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         border-left: 6px solid #4b6cb7;
         width: 100%;
-    }
-    .card-title {
-        font-size: 1.4rem;
-        font-weight: bold;
-        color: #1e293b;
-        margin-bottom: 0px;
     }
     .ball-container {
         display: flex;
@@ -280,7 +254,6 @@ def render_all_latest():
     .blue-ball {
         background: linear-gradient(135deg, #3b82f6, #1e3a8a);
     }
-    /* 手机/平板适配 */
     @media (max-width: 768px) {
         .ball-grid {
             grid-template-columns: repeat(10, minmax(30px, 36px));
@@ -299,7 +272,7 @@ def render_all_latest():
     </style>
     """, unsafe_allow_html=True)
     
-    # 按顺序一行一个卡片
+    # 按顺序显示卡片
     for name in DISPLAY_ORDER:
         if name in data_map:
             nums, issue, date_str, cfg = data_map[name]
@@ -307,10 +280,7 @@ def render_all_latest():
             st.markdown(card_html, unsafe_allow_html=True)
     
     # 底部免责声明
-    st.markdown(
-        '<div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div style="text-align: center; font-size: 1rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
