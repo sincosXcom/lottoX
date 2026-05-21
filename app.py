@@ -129,17 +129,20 @@ def verify_card_from_sheets(user_code):
     except Exception:
         return False, "验证服务异常，请稍后重试"
 
-# ================== 彩种配置 ==================
+# ================== 彩种配置（不含韩国乐透，添加排列5） ==================
 LOTTERY_CONFIG = {
-    "快乐8": {"sheet": "kl8", "columns": ["issue", "date"] + [f"n{i}" for i in range(1,21)], "number_cols": [f"n{i}" for i in range(1,21)], "type": "乐透", "red_count": 20, "blue_count": 0},
-    "双色球": {"sheet": "ssq", "columns": ["issue", "date", "red1","red2","red3","red4","red5","red6","blue"], "number_cols": ["red1","red2","red3","red4","red5","red6","blue"], "type": "乐透", "red_count": 6, "blue_count": 1},
-    "大乐透": {"sheet": "dlt", "columns": ["issue", "date", "red1","red2","red3","red4","red5","blue1","blue2"], "number_cols": ["red1","red2","red3","red4","red5","blue1","blue2"], "type": "乐透", "red_count": 5, "blue_count": 2},
-    "七乐彩": {"sheet": "qlc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","n7","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","n7","special"], "type": "乐透", "red_count": 7, "blue_count": 1},
-    "韩国乐透": {"sheet": "klotto", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","special"], "type": "乐透", "red_count": 6, "blue_count": 1},
-    "福彩3D": {"sheet": "sd", "columns": ["issue", "date", "n1","n2","n3"], "number_cols": ["n1","n2","n3"], "type": "数字型", "red_count": 3, "blue_count": 0},
-    "排列3": {"sheet": "p3", "columns": ["issue", "date", "n1","n2","n3"], "number_cols": ["n1","n2","n3"], "type": "数字型", "red_count": 3, "blue_count": 0},
-    "七星彩": {"sheet": "qxc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","special"], "type": "数字型", "red_count": 6, "blue_count": 1},
+    "双色球": {"sheet": "ssq", "columns": ["issue", "date", "red1","red2","red3","red4","red5","red6","blue"], "number_cols": ["red1","red2","red3","red4","red5","red6","blue"], "red_count": 6, "blue_count": 1},
+    "大乐透": {"sheet": "dlt", "columns": ["issue", "date", "red1","red2","red3","red4","red5","blue1","blue2"], "number_cols": ["red1","red2","red3","red4","red5","blue1","blue2"], "red_count": 5, "blue_count": 2},
+    "快乐8": {"sheet": "kl8", "columns": ["issue", "date"] + [f"n{i}" for i in range(1,21)], "number_cols": [f"n{i}" for i in range(1,21)], "red_count": 20, "blue_count": 0},
+    "排列3": {"sheet": "p3", "columns": ["issue", "date", "n1","n2","n3"], "number_cols": ["n1","n2","n3"], "red_count": 3, "blue_count": 0},
+    "福彩3D": {"sheet": "sd", "columns": ["issue", "date", "n1","n2","n3"], "number_cols": ["n1","n2","n3"], "red_count": 3, "blue_count": 0},
+    "排列5": {"sheet": "p5", "columns": ["issue", "date", "n1","n2","n3","n4","n5"], "number_cols": ["n1","n2","n3","n4","n5"], "red_count": 5, "blue_count": 0},
+    "七乐彩": {"sheet": "qlc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","n7","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","n7","special"], "red_count": 7, "blue_count": 1},
+    "七星彩": {"sheet": "qxc", "columns": ["issue", "date", "n1","n2","n3","n4","n5","n6","special"], "number_cols": ["n1","n2","n3","n4","n5","n6","special"], "red_count": 6, "blue_count": 1},
 }
+
+# 顺序（每行两个，按列表顺序排列）
+DISPLAY_ORDER = ["双色球", "大乐透", "快乐8", "排列3", "福彩3D", "排列5", "七乐彩", "七星彩"]
 
 # ================== 最新开奖展示 ==================
 def get_latest_issue_data(sheet_name, config):
@@ -181,37 +184,97 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 
 def render_all_latest():
     st.markdown("## 🎯 最新开奖结果")
-    groups = {"乐透": [], "数字型": []}
+    
+    # 获取所有彩种的最新数据
+    data_map = {}
     for name, cfg in LOTTERY_CONFIG.items():
         nums, issue, date_str = get_latest_issue_data(cfg["sheet"], cfg)
         if nums:
-            groups[cfg["type"]].append((name, issue, date_str, nums, cfg))
+            data_map[name] = (nums, issue, date_str, cfg)
     
+    # 按顺序展示，每行两个
     st.markdown("""
     <style>
-    .lottery-card { background: #f8fafc; border-radius: 20px; padding: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 6px solid #4b6cb7; }
-    .card-title { font-size: 1.4rem; font-weight: bold; color: #1e293b; margin-bottom: 6px; }
-    .card-issue { font-size: 0.85rem; color: #64748b; margin-bottom: 12px; }
-    .ball-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .ball-grid { display: grid; grid-template-columns: repeat(10, 40px); gap: 6px; justify-content: center; margin-top: 8px; }
-    .number-ball { display: inline-block; width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; font-weight: bold; font-size: 16px; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .red-ball { background: linear-gradient(135deg, #ef4444, #b91c1c); }
-    .blue-ball { background: linear-gradient(135deg, #3b82f6, #1e3a8a); }
+    .lottery-card {
+        background: #f8fafc;
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-left: 6px solid #4b6cb7;
+        height: 100%;
+    }
+    .card-title {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 6px;
+    }
+    .card-issue {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
+    .ball-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .ball-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 40px);
+        gap: 6px;
+        justify-content: start;
+        margin-top: 8px;
+    }
+    .number-ball {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        line-height: 40px;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 16px;
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .red-ball {
+        background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+    .blue-ball {
+        background: linear-gradient(135deg, #3b82f6, #1e3a8a);
+    }
+    /* 手机端适配：小屏幕下每个卡片占满宽度 */
+    @media (max-width: 768px) {
+        .stColumn {
+            width: 100% !important;
+            flex: 100% !important;
+        }
+        .ball-grid {
+            grid-template-columns: repeat(10, minmax(30px, 40px));
+            gap: 4px;
+        }
+        .number-ball {
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            font-size: 12px;
+        }
+    }
     </style>
     """, unsafe_allow_html=True)
     
-    if groups["乐透"]:
-        st.subheader("🎲 乐透型")
+    # 将彩种按每两个一组放入列
+    for i in range(0, len(DISPLAY_ORDER), 2):
         cols = st.columns(2)
-        for i, (name, issue, date_str, nums, cfg) in enumerate(groups["乐透"]):
-            with cols[i % 2]:
-                st.markdown(render_lottery_card(name, issue, date_str, nums, cfg), unsafe_allow_html=True)
-    if groups["数字型"]:
-        st.subheader("🔢 数字型")
-        cols = st.columns(3)
-        for i, (name, issue, date_str, nums, cfg) in enumerate(groups["数字型"]):
-            with cols[i % 3]:
-                st.markdown(render_lottery_card(name, issue, date_str, nums, cfg), unsafe_allow_html=True)
+        for j, name in enumerate(DISPLAY_ORDER[i:i+2]):
+            if name in data_map:
+                nums, issue, date_str, cfg = data_map[name]
+                card_html = render_lottery_card(name, issue, date_str, nums, cfg)
+                with cols[j]:
+                    st.markdown(card_html, unsafe_allow_html=True)
 
 # ================== 主函数 ==================
 def main():
@@ -257,12 +320,9 @@ def main():
                     st.error(msg)
     else:
         st.sidebar.success(f"🌟 VIP 已激活 (剩余 {st.session_state.vip_days_left} 天)")
-        # 彩种下拉菜单
         selected_vip_lottery = st.sidebar.selectbox("选择彩种进行高阶分析", list(LOTTERY_CONFIG.keys()), key="vip_lottery_select")
-        # 走势图按钮
         if st.sidebar.button("📈 走势图", use_container_width=True):
             st.session_state.show_trend = True
-        # 退出按钮
         if st.sidebar.button("退出 VIP", use_container_width=True):
             st.session_state.vip_unlocked = False
             st.rerun()
@@ -270,7 +330,7 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    # 主区域
+    # 主区域：显示最新开奖
     render_all_latest()
     
     # 如果 VIP 激活且点击了走势图按钮，则显示走势图（占位）
@@ -278,7 +338,6 @@ def main():
         st.markdown("---")
         st.subheader(f"📈 {selected_vip_lottery} 走势图（开发中）")
         st.info("走势图功能即将上线，请等待后续更新。")
-        # 重置标记，避免重复显示
         st.session_state.show_trend = False
 
 if __name__ == "__main__":
