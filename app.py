@@ -10,7 +10,7 @@ from streamlit.runtime.scriptrunner import get_script_run_ctx
 from collections import Counter
 
 # ================== 页面配置 ==================
-st.set_page_config(page_title="彩票历史数据中心", layout="wide")
+st.set_page_config(page_title="彩票数据中心 | 最新开奖", layout="wide")
 
 # ================== Redis 在线人数（带前缀） ==================
 APP_PREFIX = "lotto_data"
@@ -64,7 +64,6 @@ def update_online_status():
         r.setex(f"user:{uid}", 300, time.time())
         r.sadd("online_users_set", uid)
     except Exception:
-        # 静默失败，避免干扰
         pass
 
 def get_online_count():
@@ -106,35 +105,6 @@ def load_lottery_data(sheet_name, expected_columns):
     except Exception as e:
         st.error(f"加载 {sheet_name} 数据失败: {str(e)}")
         return pd.DataFrame()
-
-# ================== 显示表格 ==================
-def format_numbers_row(row, number_cols):
-    parts = []
-    for col in number_cols:
-        if col in row and pd.notna(row[col]):
-            val = str(int(row[col])) if isinstance(row[col], float) else str(row[col])
-            parts.append(val)
-    return " ".join(parts)
-
-def display_lottery_table(df, config):
-    if df.empty:
-        st.info("暂无数据")
-        return
-    number_cols = config["number_cols"]
-    display_df = df.copy()
-    display_df["开奖号码"] = display_df.apply(lambda row: format_numbers_row(row, number_cols), axis=1)
-    cols_to_show = []
-    if "issue" in display_df.columns:
-        cols_to_show.append("期号")
-        display_df.rename(columns={"issue": "期号"}, inplace=True)
-    if "date" in display_df.columns:
-        cols_to_show.append("日期")
-        display_df["日期"] = display_df["date"].dt.strftime("%Y-%m-%d") if pd.api.types.is_datetime64_any_dtype(display_df["date"]) else display_df["date"]
-        if "date" in display_df.columns:
-            display_df.drop(columns=["date"], inplace=True)
-    cols_to_show.append("开奖号码")
-    display_df = display_df[cols_to_show]
-    st.dataframe(display_df, use_container_width=True, height=600)
 
 # ================== VIP 授权验证 ==================
 def verify_card_from_sheets(user_code):
@@ -181,43 +151,187 @@ LOTTERY_CONFIG = {
         "sheet": "kl8",
         "columns": ["issue", "date"] + [f"n{i}" for i in range(1, 21)],
         "number_cols": [f"n{i}" for i in range(1, 21)],
+        "type": "乐透",
+        "red_start": 0, "red_count": 20, "blue_start": -1, "blue_count": 0
     },
     "双色球": {
         "sheet": "ssq",
         "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "red6", "blue"],
         "number_cols": ["red1", "red2", "red3", "red4", "red5", "red6", "blue"],
+        "type": "乐透",
+        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
     },
     "大乐透": {
         "sheet": "dlt",
         "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
         "number_cols": ["red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
-    },
-    "福彩3D": {
-        "sheet": "sd",
-        "columns": ["issue", "date", "n1", "n2", "n3"],
-        "number_cols": ["n1", "n2", "n3"],
-    },
-    "排列3": {
-        "sheet": "p3",
-        "columns": ["issue", "date", "n1", "n2", "n3"],
-        "number_cols": ["n1", "n2", "n3"],
+        "type": "乐透",
+        "red_start": 0, "red_count": 5, "blue_start": 5, "blue_count": 2
     },
     "七乐彩": {
         "sheet": "qlc",
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
-    },
-    "七星彩": {
-        "sheet": "qxc",
-        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
-        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "type": "乐透",
+        "red_start": 0, "red_count": 7, "blue_start": 7, "blue_count": 1  # special 作蓝球
     },
     "韩国乐透": {
         "sheet": "klotto",
         "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
         "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "type": "乐透",
+        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
     },
+    "福彩3D": {
+        "sheet": "sd",
+        "columns": ["issue", "date", "n1", "n2", "n3"],
+        "number_cols": ["n1", "n2", "n3"],
+        "type": "数字型",
+        "red_start": 0, "red_count": 3, "blue_start": -1, "blue_count": 0
+    },
+    "排列3": {
+        "sheet": "p3",
+        "columns": ["issue", "date", "n1", "n2", "n3"],
+        "number_cols": ["n1", "n2", "n3"],
+        "type": "数字型",
+        "red_start": 0, "red_count": 3, "blue_start": -1, "blue_count": 0
+    },
+    "七星彩": {
+        "sheet": "qxc",
+        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "type": "数字型",
+        "red_start": 0, "red_count": 6, "blue_start": 6, "blue_count": 1
+    }
 }
+
+# ================== 最新一期展示 ==================
+def get_latest_issue_data(sheet_name, config):
+    """返回最新一期的行数据 (dict) 和期号、日期"""
+    df = load_lottery_data(sheet_name, config["columns"])
+    if df.empty:
+        return None, None, None
+    latest = df.iloc[-1]
+    issue = latest["issue"] if "issue" in latest else None
+    date = latest["date"] if "date" in latest else None
+    # 提取号码值
+    numbers = []
+    for col in config["number_cols"]:
+        val = latest[col]
+        if pd.notna(val):
+            numbers.append(str(int(val)) if isinstance(val, float) else str(val))
+        else:
+            numbers.append("?")
+    return numbers, issue, date
+
+def render_lottery_card(title, issue, date, numbers, config):
+    """生成一个彩种卡片，带彩色号码球"""
+    # 确定红球和蓝球范围
+    red_count = config.get("red_count", 0)
+    blue_count = config.get("blue_count", 0)
+    if red_count == 0:
+        # 默认全部视为红球样式
+        red_numbers = numbers
+        blue_numbers = []
+    else:
+        red_numbers = numbers[:red_count]
+        blue_numbers = numbers[red_count:red_count+blue_count] if blue_count > 0 else []
+    
+    # 构建 HTML 号码球
+    ball_html = ""
+    for n in red_numbers:
+        ball_html += f'<div class="number-ball red-ball">{n}</div>'
+    for n in blue_numbers:
+        ball_html += f'<div class="number-ball blue-ball">{n}</div>'
+    
+    card = f"""
+    <div class="lottery-card">
+        <div class="card-title">{title}</div>
+        <div class="card-issue">期号: {issue} | {date.strftime('%Y-%m-%d') if date else ''}</div>
+        <div class="ball-container">{ball_html}</div>
+    </div>
+    """
+    return card
+
+def render_all_latest():
+    """读取所有彩种最新一期，分组展示"""
+    st.markdown("## 🎯 最新开奖结果")
+    
+    # 分组
+    lottery_groups = {"乐透型": [], "数字型": []}
+    for name, config in LOTTERY_CONFIG.items():
+        numbers, issue, date = get_latest_issue_data(config["sheet"], config)
+        if numbers is None:
+            continue
+        lottery_groups[config["type"]].append((name, issue, date, numbers, config))
+    
+    # 样式
+    st.markdown("""
+    <style>
+    .lottery-card {
+        background: #f8fafc;
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: 0.2s;
+        border-left: 6px solid #4b6cb7;
+    }
+    .card-title {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 6px;
+    }
+    .card-issue {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
+    .ball-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .number-ball {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        line-height: 40px;
+        text-align: center;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 16px;
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .red-ball {
+        background: linear-gradient(135deg, #ef4444, #b91c1c);
+    }
+    .blue-ball {
+        background: linear-gradient(135deg, #3b82f6, #1e3a8a);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 展示乐透型
+    if lottery_groups["乐透型"]:
+        st.subheader("🎲 乐透型")
+        cols = st.columns(2)  # 每行2个卡片
+        for idx, (name, issue, date, numbers, config) in enumerate(lottery_groups["乐透型"]):
+            with cols[idx % 2]:
+                card = render_lottery_card(name, issue, date, numbers, config)
+                st.markdown(card, unsafe_allow_html=True)
+    
+    # 展示数字型
+    if lottery_groups["数字型"]:
+        st.subheader("🔢 数字型 (3D/排列3/七星彩)")
+        cols = st.columns(3)  # 每行3个卡片
+        for idx, (name, issue, date, numbers, config) in enumerate(lottery_groups["数字型"]):
+            with cols[idx % 3]:
+                card = render_lottery_card(name, issue, date, numbers, config)
+                st.markdown(card, unsafe_allow_html=True)
 
 # ================== 主界面 ==================
 def main():
@@ -225,7 +339,7 @@ def main():
     
     # 侧边栏
     st.sidebar.title("🎰 彩票数据中心")
-    announcement = "🎯 欢迎使用彩票历史数据中心 | 数据每日更新 | VIP功能即将上线"
+    announcement = "🎯 欢迎使用彩票数据中心 | 数据每日更新 | VIP解锁高阶分析"
     st.sidebar.markdown(
         f"""
         <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
@@ -243,29 +357,15 @@ def main():
         unsafe_allow_html=True
     )
     st.sidebar.divider()
-    
-    selected_lottery = st.sidebar.selectbox("📌 选择彩种", list(LOTTERY_CONFIG.keys()))
-    config = LOTTERY_CONFIG[selected_lottery]
-    
-    with st.spinner(f"加载 {selected_lottery} 数据..."):
-        df = load_lottery_data(config["sheet"], config["columns"])
     st.sidebar.subheader("📊 数据统计")
-    if not df.empty:
-        st.sidebar.metric("总期数", len(df))
-        latest_issue = df["issue"].iloc[-1] if "issue" in df.columns else "N/A"
-        st.sidebar.metric("最新期号", latest_issue)
-    else:
-        st.sidebar.info("暂无数据")
-    
-    # 在线人数移至侧边栏最底部
+    st.sidebar.info("当前展示所有彩种最新一期开奖结果")
     st.sidebar.divider()
     st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
     
-    st.title(f"{selected_lottery} 历史开奖记录")
-    st.caption("最新一期显示在最底部")
-    display_lottery_table(df, config)
+    # 主区域：展示所有彩种最新一期
+    render_all_latest()
     
-    # VIP 高阶分析区域
+    # ========== VIP 高阶分析（解锁后显示热冷号等） ==========
     st.markdown("---")
     st.subheader("🔓 VIP 高阶分析")
     
@@ -297,6 +397,11 @@ def main():
                     st.error(msg)
     else:
         st.success(f"🌟 VIP 已激活，剩余 {st.session_state.vip_days_left} 天")
+        # VIP 功能：可以选择彩种后展示热冷号（保留原有分析，但可改进）
+        selected_lottery = st.selectbox("请选择彩种进行分析", list(LOTTERY_CONFIG.keys()))
+        config = LOTTERY_CONFIG[selected_lottery]
+        with st.spinner(f"加载 {selected_lottery} 数据..."):
+            df = load_lottery_data(config["sheet"], config["columns"])
         if not df.empty:
             all_numbers = []
             for col in config["number_cols"]:
@@ -305,12 +410,12 @@ def main():
             if all_numbers:
                 counter = Counter(all_numbers)
                 top10 = counter.most_common(10)
-                st.markdown("**🔥 历史热号 TOP 10**")
+                st.markdown(f"**🔥 {selected_lottery} 历史热号 TOP 10**")
                 cols = st.columns(10)
                 for i, (num, cnt) in enumerate(top10):
                     with cols[i]:
                         st.metric(label=str(num), value=int(cnt))
-                st.markdown("**❄️ 历史冷号（出现次数最少）**")
+                st.markdown(f"**❄️ {selected_lottery} 历史冷号（出现次数最少）**")
                 bottom10 = counter.most_common()[-10:]
                 cols2 = st.columns(10)
                 for i, (num, cnt) in enumerate(bottom10):
@@ -319,7 +424,7 @@ def main():
             else:
                 st.info("无号码数据")
         else:
-            st.info("暂无数据，请先选择有数据的彩种")
+            st.info("暂无数据，请稍后重试")
         
         if st.button("退出 VIP", use_container_width=True):
             st.session_state.vip_unlocked = False
