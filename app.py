@@ -182,7 +182,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
         <div style="margin-bottom: 12px; line-height: 1.4;">
             <span class="card-title">{title}</span>
             <span> </span>
-            <span style="font-size: 0.85rem; color: #6c757d;"> </span>
+            <span style="font-size: 0.85rem; color: #6c757d;">&nbsp;&nbsp;</span>
             <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{issue_number}</span>
             <span style="font-size: 0.85rem; color: #6c757d;"> | {date_display}</span>
         </div>
