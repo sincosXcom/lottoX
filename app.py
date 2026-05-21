@@ -3,117 +3,103 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import requests
+import time
+import uuid
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
 # ================== 页面配置 ==================
-st.set_page_config(page_title="彩票历史数据查询", layout="wide")
+st.set_page_config(page_title="彩票历史数据中心", layout="wide")
 
-# ================== 彩种配置 ==================
-LOTTERY_CONFIG = {
-    "快乐8": {
-        "sheet": "kl8",
-        "columns": ["issue", "date"] + [f"n{i}" for i in range(1, 21)],
-        "number_cols": [f"n{i}" for i in range(1, 21)],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "双色球": {
-        "sheet": "ssq",
-        "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "red6", "blue"],
-        "number_cols": ["red1", "red2", "red3", "red4", "red5", "red6", "blue"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "大乐透": {
-        "sheet": "dlt",
-        "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
-        "number_cols": ["red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "福彩3D": {
-        "sheet": "sd",
-        "columns": ["issue", "date", "n1", "n2", "n3"],
-        "number_cols": ["n1", "n2", "n3"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "排列3": {
-        "sheet": "p3",
-        "columns": ["issue", "date", "n1", "n2", "n3"],
-        "number_cols": ["n1", "n2", "n3"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "七乐彩": {
-        "sheet": "qlc",
-        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
-        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "七星彩": {
-        "sheet": "qxc",
-        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
-        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
-        "date_col": "date",
-        "issue_col": "issue"
-    },
-    "韩国乐透": {
-        "sheet": "klotto",
-        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
-        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
-        "date_col": "date",
-        "issue_col": "issue"
-    }
-}
+# ================== Redis 在线人数（带前缀） ==================
+APP_PREFIX = "lotto_data"  # 唯一前缀，与老站点隔离
 
-# ================== Google Sheets 连接 ==================
+class RedisClient:
+    def __init__(self, url, token):
+        self.url = url.rstrip('/')
+        self.token = token
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "text/plain"
+        })
+
+    def setex(self, key, ttl, value):
+        prefixed_key = f"{APP_PREFIX}:{key}"
+        url = f"{self.url}/set/{prefixed_key}?EX={ttl}"
+        resp = self.session.post(url, data=str(value))
+        return resp.ok
+
+    def sadd(self, set_name, member):
+        prefixed_set = f"{APP_PREFIX}:{set_name}"
+        url = f"{self.url}/sadd/{prefixed_set}"
+        resp = self.session.post(url, data=member)
+        return resp.ok
+
+    def scard(self, set_name):
+        prefixed_set = f"{APP_PREFIX}:{set_name}"
+        url = f"{self.url}/scard/{prefixed_set}"
+        resp = self.session.get(url)
+        if resp.ok:
+            return resp.json().get("result", 0)
+        return 0
+
+@st.cache_resource
+def get_redis():
+    return RedisClient(st.secrets["redis"]["url"], st.secrets["redis"]["token"])
+
+def get_user_id():
+    ctx = get_script_run_ctx()
+    if ctx and ctx.session_id:
+        return ctx.session_id
+    if "user_id" not in st.session_state:
+        st.session_state.user_id = str(uuid.uuid4())
+    return st.session_state.user_id
+
+def update_online_status():
+    try:
+        r = get_redis()
+        uid = get_user_id()
+        r.setex(f"user:{uid}", 300, time.time())
+        r.sadd("online_users_set", uid)
+    except Exception as e:
+        st.sidebar.error(f"在线人数异常: {e}")
+
+def get_online_count():
+    try:
+        r = get_redis()
+        return r.scard("online_users_set")
+    except:
+        return 0
+
+# ================== Google Sheets 数据加载 ==================
 @st.cache_resource
 def get_gsheet_client():
-    """获取 Google Sheets 客户端（单例）"""
-    # 只需要 Spreadsheets 权限即可，不需要 Drive API
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
     return gspread.authorize(creds)
 
 @st.cache_data(ttl=3600)
 def load_lottery_data(sheet_name, expected_columns):
-    """从指定工作表加载数据，返回 DataFrame（期号升序）"""
     try:
         client = get_gsheet_client()
-        # 从 Secrets 中读取表格 ID
         spreadsheet_id = st.secrets["google"]["spreadsheet_id"]
         spreadsheet = client.open_by_key(spreadsheet_id)
         worksheet = spreadsheet.worksheet(sheet_name)
-        
-        # 获取所有数据（从A1开始）
         all_data = worksheet.get_all_values()
         if len(all_data) < 2:
             return pd.DataFrame(columns=expected_columns)
-        
-        # 第一行作为表头
         headers = all_data[0]
         rows = all_data[1:]
-        
-        # 将数据转换为 DataFrame
         df = pd.DataFrame(rows, columns=headers)
-        
-        # 只保留需要的列（如果实际列名与预期不完全一致，进行映射）
         existing_cols = [col for col in expected_columns if col in df.columns]
         df = df[existing_cols]
-        
-        # 转换期号为数值（用于排序）
         if "issue" in df.columns:
-            # 尝试转为整数，无法转换的变成 NaN 并过滤
             df["issue"] = pd.to_numeric(df["issue"], errors="coerce")
             df = df.dropna(subset=["issue"])
-            # 关键：按期号升序排列，确保最新一期在最后
             df = df.sort_values("issue", ascending=True).reset_index(drop=True)
-        
-        # 转换日期（可选）
         if "date" in df.columns:
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        
         return df
     except Exception as e:
         st.error(f"加载 {sheet_name} 数据失败: {str(e)}")
@@ -121,7 +107,6 @@ def load_lottery_data(sheet_name, expected_columns):
 
 # ================== 显示表格 ==================
 def format_numbers_row(row, number_cols):
-    """将号码列格式化为字符串，方便显示"""
     parts = []
     for col in number_cols:
         if col in row and pd.notna(row[col]):
@@ -130,56 +115,147 @@ def format_numbers_row(row, number_cols):
     return " ".join(parts)
 
 def display_lottery_table(df, config):
-    """显示彩票数据表格，最新一期在底部"""
     if df.empty:
         st.info("暂无数据")
         return
-    
     number_cols = config["number_cols"]
-    # 构建展示用的 DataFrame
     display_df = df.copy()
-    # 添加“开奖号码”列（合并所有号码）
     display_df["开奖号码"] = display_df.apply(lambda row: format_numbers_row(row, number_cols), axis=1)
-    
-    # 选择要显示的列（期号、日期、开奖号码）
     cols_to_show = []
     if "issue" in display_df.columns:
         cols_to_show.append("期号")
         display_df.rename(columns={"issue": "期号"}, inplace=True)
     if "date" in display_df.columns:
         cols_to_show.append("日期")
-        # 将日期格式化为字符串，避免显示时间戳
         display_df["日期"] = display_df["date"].dt.strftime("%Y-%m-%d") if pd.api.types.is_datetime64_any_dtype(display_df["date"]) else display_df["date"]
-        # 移除原始的 date 列避免重复
         if "date" in display_df.columns:
             display_df.drop(columns=["date"], inplace=True)
     cols_to_show.append("开奖号码")
-    
-    # 确保列顺序
     display_df = display_df[cols_to_show]
-    
-    # 使用 st.dataframe 展示，支持滚动和排序
     st.dataframe(display_df, use_container_width=True, height=600)
+
+# ================== VIP 授权验证 ==================
+def verify_card_from_sheets(user_code):
+    """从 Google Sheets 的 Cards 工作表验证授权码"""
+    try:
+        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+        creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scopes)
+        client = gspread.authorize(creds)
+        spreadsheet_id = st.secrets["google"]["spreadsheet_id"]  # 使用同一个表格，需要包含 Cards 工作表
+        sh = client.open_by_key(spreadsheet_id)
+        ws = sh.worksheet("Cards")
+        # 使用 find 方法精确查找
+        try:
+            cell = ws.find(user_code, in_column=1)
+        except gspread.exceptions.CellNotFound:
+            return False, "授权码不存在"
+        row_num = cell.row
+        row_data = ws.row_values(row_num)
+        if len(row_data) < 4:
+            return False, "数据格式错误"
+        days_str = row_data[1].strip()
+        status = row_data[2].strip() if len(row_data) > 2 else ""
+        active_time_str = row_data[3].strip() if len(row_data) > 3 else ""
+        if status == "封禁":
+            return False, "授权码已被封禁"
+        now = datetime.now()
+        if not active_time_str:
+            ws.update_cell(row_num, 3, "已激活")
+            ws.update_cell(row_num, 4, now.strftime("%Y-%m-%d %H:%M:%S"))
+            return True, int(days_str)
+        else:
+            start = datetime.strptime(active_time_str, "%Y-%m-%d %H:%M:%S")
+            used_days = (now - start).days
+            remaining = int(days_str) - used_days
+            if remaining > 0:
+                return True, remaining
+            else:
+                return False, f"授权已过期 {remaining} 天"
+    except Exception as e:
+        return False, "验证服务异常，请稍后重试"
+
+# ================== 彩种配置 ==================
+LOTTERY_CONFIG = {
+    "快乐8": {
+        "sheet": "kl8",
+        "columns": ["issue", "date"] + [f"n{i}" for i in range(1, 21)],
+        "number_cols": [f"n{i}" for i in range(1, 21)],
+    },
+    "双色球": {
+        "sheet": "ssq",
+        "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "red6", "blue"],
+        "number_cols": ["red1", "red2", "red3", "red4", "red5", "red6", "blue"],
+    },
+    "大乐透": {
+        "sheet": "dlt",
+        "columns": ["issue", "date", "red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
+        "number_cols": ["red1", "red2", "red3", "red4", "red5", "blue1", "blue2"],
+    },
+    "福彩3D": {
+        "sheet": "sd",
+        "columns": ["issue", "date", "n1", "n2", "n3"],
+        "number_cols": ["n1", "n2", "n3"],
+    },
+    "排列3": {
+        "sheet": "p3",
+        "columns": ["issue", "date", "n1", "n2", "n3"],
+        "number_cols": ["n1", "n2", "n3"],
+    },
+    "七乐彩": {
+        "sheet": "qlc",
+        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
+        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "special"],
+    },
+    "七星彩": {
+        "sheet": "qxc",
+        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
+    },
+    "韩国乐透": {
+        "sheet": "klotto",
+        "columns": ["issue", "date", "n1", "n2", "n3", "n4", "n5", "n6", "special"],
+        "number_cols": ["n1", "n2", "n3", "n4", "n5", "n6", "special"],
+    },
+}
 
 # ================== 主界面 ==================
 def main():
-    st.title("📊 彩票历史数据中心")
+    # 更新在线人数（放在页面渲染前）
+    update_online_status()
     
-    # 侧边栏选择彩种
-    st.sidebar.title("彩种选择")
-    selected_lottery = st.sidebar.selectbox("请选择彩种", list(LOTTERY_CONFIG.keys()))
+    # 侧边栏
+    st.sidebar.title("🎰 彩票数据中心")
+    # 滚动公告
+    announcement = "🎯 欢迎使用彩票历史数据中心 | 数据每日更新 | VIP功能即将上线"
+    st.sidebar.markdown(
+        f"""
+        <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
+            <div style="display:inline-block; animation: scroll-left 12s linear infinite;">
+                {announcement}
+            </div>
+        </div>
+        <style>
+            @keyframes scroll-left {{
+                0% {{ transform: translateX(100%); }}
+                100% {{ transform: translateX(-100%); }}
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    st.sidebar.divider()
+    # 在线人数
+    st.sidebar.metric("👥 当前在线", get_online_count())
+    st.sidebar.divider()
     
-    # 获取配置
+    # 彩种选择
+    selected_lottery = st.sidebar.selectbox("📌 选择彩种", list(LOTTERY_CONFIG.keys()))
     config = LOTTERY_CONFIG[selected_lottery]
-    sheet_name = config["sheet"]
     
-    # 加载数据
-    with st.spinner(f"正在加载 {selected_lottery} 数据..."):
-        df = load_lottery_data(sheet_name, config["columns"])
-    
-    # 显示数据统计
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("数据统计")
+    # 数据统计
+    with st.spinner(f"加载 {selected_lottery} 数据..."):
+        df = load_lottery_data(config["sheet"], config["columns"])
+    st.sidebar.subheader("📊 数据统计")
     if not df.empty:
         st.sidebar.metric("总期数", len(df))
         latest_issue = df["issue"].iloc[-1] if "issue" in df.columns else "N/A"
@@ -187,14 +263,66 @@ def main():
     else:
         st.sidebar.info("暂无数据")
     
-    # 右侧显示数据表格
-    st.subheader(f"{selected_lottery} 历史开奖记录 (最新一期在底部)")
+    # 主区域标题
+    st.title(f"{selected_lottery} 历史开奖记录")
+    st.caption("最新一期显示在最底部")
+    
+    # 显示表格
     display_lottery_table(df, config)
     
-    # 可选：显示原始数据前几行（调试用）
-    with st.expander("查看原始数据（前5行）"):
+    # ========== VIP 高阶功能（解锁后显示额外分析） ==========
+    st.markdown("---")
+    st.subheader("🔓 VIP 高阶分析")
+    
+    if "vip_unlocked" not in st.session_state:
+        st.session_state.vip_unlocked = False
+        st.session_state.vip_days_left = 0
+    
+    if not st.session_state.vip_unlocked:
+        # 解锁界面
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            auth_code = st.text_input("请输入授权码", type="password", key="vip_code")
+        with col2:
+            if st.button("激活 VIP", use_container_width=True):
+                ok, msg = verify_card_from_sheets(auth_code)
+                if ok:
+                    st.session_state.vip_unlocked = True
+                    st.session_state.vip_days_left = msg
+                    st.success(f"解锁成功！剩余 {msg} 天")
+                    st.rerun()
+                else:
+                    st.error(msg)
+    else:
+        st.success(f"🌟 VIP 已激活，剩余 {st.session_state.vip_days_left} 天")
+        # 高阶分析示例：号码频次统计（基于当前彩种数据）
         if not df.empty:
-            st.dataframe(df.head(5))
+            # 统计所有号码出现次数
+            all_numbers = []
+            for col in config["number_cols"]:
+                if col in df.columns:
+                    all_numbers.extend(df[col].dropna().astype(int).tolist())
+            if all_numbers:
+                from collections import Counter
+                counter = Counter(all_numbers)
+                top10 = counter.most_common(10)
+                st.markdown("**🔥 历史热号 TOP 10**")
+                cols = st.columns(10)
+                for i, (num, cnt) in enumerate(top10):
+                    cols[i].metric(num, cnt)
+                st.markdown("**❄️ 历史冷号（出现次数最少）**")
+                bottom10 = counter.most_common()[-10:]
+                cols2 = st.columns(10)
+                for i, (num, cnt) in enumerate(bottom10):
+                    cols2[i].metric(num, cnt)
+            else:
+                st.info("无号码数据")
+        else:
+            st.info("暂无数据，请先选择有数据的彩种")
+        
+        if st.button("退出 VIP", use_container_width=True):
+            st.session_state.vip_unlocked = False
+            st.rerun()
 
 if __name__ == "__main__":
     main()
