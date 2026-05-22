@@ -20,4 +20,12 @@ jobs:
     - name: Run update script
       env:
         GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+        KL8_URL: ${{ secrets.KL8_URL }}
+        SSQ_URL: ${{ secrets.SSQ_URL }}
+        DLT_URL: ${{ secrets.DLT_URL }}
+        SD_URL: ${{ secrets.SD_URL }}
+        P3_URL: ${{ secrets.P3_URL }}
+        P5_URL: ${{ secrets.P5_URL }}
+        QXC_URL: ${{ secrets.QXC_URL }}
+        QLC_URL: ${{ secrets.QLC_URL }}
       run: python fetch_lottery_data.py
