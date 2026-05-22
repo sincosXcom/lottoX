@@ -297,7 +297,7 @@ def render_all_latest():
 def main():
     update_online_status()
     
-    st.sidebar.title("🎰 LOTTOX 彩票")
+    st.sidebar.title("🎰 LOTTOX 彩票X")
     st.sidebar.markdown(
         f"""
         <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
