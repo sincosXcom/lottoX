@@ -5,7 +5,6 @@ from google.oauth2.service_account import Credentials
 import json
 import os
 
-# 彩种配置：增加 convert_issue 标志
 LOTTERIES = {
     "快乐8": {"url": "http://data.17500.cn/kl8_asc.txt", "num_cols": 20, "sheet": "kl8", "convert_issue": False},
     "双色球": {"url": "http://data.17500.cn/ssq_asc.txt", "num_cols": 7, "sheet": "ssq", "convert_issue": False},
@@ -19,8 +18,19 @@ LOTTERIES = {
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
+def format_date(date_str):
+    """将日期格式从 2026-05-21 转换为 2026-5-21 (去掉月份和日期的前导零)"""
+    if not date_str or '-' not in date_str:
+        return date_str
+    parts = date_str.split('-')
+    if len(parts) == 3:
+        year, month, day = parts
+        month = str(int(month))
+        day = str(int(day))
+        return f"{year}-{month}-{day}"
+    return date_str
+
 def fetch_latest_issues(name, config):
-    """获取最新一期数据（期号已转换）"""
     url = config['url']
     num_cols = config['num_cols']
     convert = config.get('convert_issue', False)
@@ -45,8 +55,8 @@ def fetch_latest_issues(name, config):
             continue
         issue = parts[0]
         if convert:
-            issue = issue[2:]   # 去掉前两位 "20"，例如 2026131 → 26131
-        date_str = parts[1]
+            issue = issue[2:]   # 去掉前两位 "20"
+        date_str = format_date(parts[1])   # 统一日期格式
         numbers = []
         for n in parts[2:2+num_cols]:
             try:
@@ -63,7 +73,6 @@ def fetch_latest_issues(name, config):
     return [latest]
 
 def update_google_sheet(sheet_name, latest_row):
-    """将最新一期追加到工作表底部（去重）"""
     creds_json = os.environ.get('GOOGLE_CREDS')
     if not creds_json:
         raise Exception("缺少 GOOGLE_CREDS 环境变量")
@@ -74,13 +83,16 @@ def update_google_sheet(sheet_name, latest_row):
     spreadsheet = client.open("lotto_data")
     worksheet = spreadsheet.worksheet(sheet_name)
 
-    # 获取最后一行的期号
-    last_row_vals = worksheet.get_all_values()
-    if last_row_vals:
-        last_issue = last_row_vals[-1][0]
-        if str(last_issue) == str(latest_row[0]):
-            print(f"{sheet_name} 最新期号 {latest_row[0]} 已存在，跳过")
-            return
+    # 获取所有期号（第一列）
+    all_rows = worksheet.get_all_values()
+    existing_issues = set()
+    for row in all_rows:
+        if row:
+            existing_issues.add(row[0])
+
+    if latest_row[0] in existing_issues:
+        print(f"{sheet_name} 期号 {latest_row[0]} 已存在，跳过")
+        return
 
     worksheet.append_row(latest_row)
     print(f"{sheet_name} 已追加最新期号 {latest_row[0]}")
