@@ -319,7 +319,7 @@ def render_all_latest():
             width: 30px;
             height: 30px;
             line-height: 30px;
-            font-size: 12px;
+            font-size: 16px;
         }
         .card-title {
             font-size: 1.2rem;
