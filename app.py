@@ -461,9 +461,7 @@ def main():
         """, unsafe_allow_html=True
     )
     st.sidebar.divider()
-    st.sidebar.subheader("📊 数据统计")
-    st.sidebar.info("所有彩种最新一期开奖结果")
-    st.sidebar.divider()
+
     
     if "vip_unlocked" not in st.session_state:
         st.session_state.vip_unlocked = False
