@@ -496,8 +496,7 @@ def main():
             st.session_state.vip_unlocked = False
             st.rerun()
     
-    st.sidebar.divider()
-    st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
+
     
     if st.session_state.get("vip_unlocked", False) and st.session_state.get("show_trend", False):
         st.markdown("---")
@@ -517,6 +516,10 @@ def main():
             st.rerun()
     else:
         render_all_latest()
+
+
+    st.sidebar.divider()
+    st.sidebar.markdown(f"👥 当前在线: **{get_online_count()}**")
 
 if __name__ == "__main__":
     main()
