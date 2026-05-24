@@ -443,6 +443,12 @@ def main():
         selected_vip_lottery = st.sidebar.selectbox("选择彩种进行高阶分析", list(LOTTERY_CONFIG.keys()), key="vip_lottery_select")
         if st.sidebar.button("📈 走势图", use_container_width=True):
             st.session_state.show_trend = True
+            st.session_state.show_advanced = False
+            st.session_state.show_prediction = False
+        if st.sidebar.button("🎲 快乐8 智能预测", use_container_width=True):
+            st.session_state.show_prediction = True
+            st.session_state.show_trend = False
+            st.session_state.show_advanced = False
         if st.sidebar.button("退出 VIP", use_container_width=True):
             st.session_state.vip_unlocked = False
             st.rerun()
