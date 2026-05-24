@@ -95,6 +95,27 @@ def load_lottery_data(sheet_name, expected_columns):
         st.error(f"加载 {sheet_name} 数据失败: {str(e)}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=600)
+def load_predictions(sheet_name="kl8_predictions"):
+    try:
+        client = get_gsheet_client()
+        spreadsheet_id = st.secrets["google"]["predict_spreadsheet_id"]
+        worksheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+        all_data = worksheet.get_all_values()
+        if len(all_data) < 2:
+            return pd.DataFrame()
+        headers = all_data[0]
+        rows = all_data[1:]
+        df = pd.DataFrame(rows, columns=headers)
+        if "target_issue" in df.columns:
+            df["target_issue"] = pd.to_numeric(df["target_issue"], errors="coerce")
+        if "hit_count" in df.columns:
+            df["hit_count"] = pd.to_numeric(df["hit_count"], errors="coerce")
+        return df
+    except Exception as e:
+        st.error(f"加载预测数据失败: {str(e)}")
+        return pd.DataFrame()
+
 # ================== VIP 授权 ==================
 def verify_card_from_sheets(user_code):
     try:
