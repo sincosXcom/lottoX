@@ -452,7 +452,7 @@ def main():
         f"""
         <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
             <div style="display:inline-block; animation: scroll-left 12s linear infinite;">
-                🎯 欢迎使用LOTTOX彩票中心 | 数据每日更新 | VIP解锁高阶分析
+                ✨ 欢迎使用LOTTOX 彩票中心 | 数据每日更新 | VIP解锁高阶分析
             </div>
         </div>
         <style>
