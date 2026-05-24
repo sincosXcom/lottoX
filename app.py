@@ -488,7 +488,7 @@ def main():
             st.session_state.show_trend = True
             st.session_state.show_advanced = False
             st.session_state.show_prediction = False
-        if st.sidebar.button("🎱 快乐8 智能预测", use_container_width=True，typye=primary):
+        if st.sidebar.button("🎱 快乐8 智能预测", use_container_width=True，type=primary):
             st.session_state.show_prediction = True
             st.session_state.show_trend = False
             st.session_state.show_advanced = False
