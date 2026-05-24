@@ -251,7 +251,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
 def render_all_latest():
-    st.markdown("## 🎉 彩富密码")
+    st.markdown("## 🧧 彩富密码")
     
     # 使用北京时间
     now = get_beijing_time()
