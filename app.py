@@ -452,7 +452,7 @@ def main():
     
     if st.session_state.get("vip_unlocked", False) and st.session_state.get("show_trend", False):
         st.markdown("---")
-        st.subheader(f"📈 {st.session_state.advanced_lottery} 走势图（开发中）")
+        st.subheader(f"📈 {selected_vip_lottery} 走势图（开发中）")
         st.info("走势图功能即将上线，请等待后续更新。")
         st.session_state.show_trend = False
         st.markdown("---")
