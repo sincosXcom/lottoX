@@ -116,6 +116,30 @@ def load_predictions(sheet_name="kl8_predictions"):
         st.error(f"加载预测数据失败: {str(e)}")
         return pd.DataFrame()
 
+def load_sheet_data(sheet_name, expected_columns, spreadsheet_id):
+    try:
+        client = get_gsheet_client()
+        spreadsheet = client.open_by_key(spreadsheet_id)
+        worksheet = spreadsheet.worksheet(sheet_name)
+        all_data = worksheet.get_all_values()
+        if len(all_data) < 2:
+            return pd.DataFrame(columns=expected_columns)
+        headers = all_data[0]
+        rows = all_data[1:]
+        df = pd.DataFrame(rows, columns=headers)
+        existing_cols = [col for col in expected_columns if col in df.columns]
+        df = df[existing_cols]
+        if "issue" in df.columns:
+            df["issue"] = pd.to_numeric(df["issue"], errors="coerce")
+            df = df.dropna(subset=["issue"])
+            df = df.sort_values("issue", ascending=True).reset_index(drop=True)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        return df
+    except Exception as e:
+        st.error(f"加载 {sheet_name} 数据失败: {str(e)}")
+        return pd.DataFrame()
+        
 # ================== VIP 授权 ==================
 def verify_card_from_sheets(user_code):
     try:
