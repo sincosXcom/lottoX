@@ -251,7 +251,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
 def render_all_latest():
-    st.markdown("## 🎯 最新开奖结果")
+    st.markdown("## 🎉 彩富密码")
     
     # 使用北京时间
     now = get_beijing_time()
@@ -340,7 +340,7 @@ def render_all_latest():
 
 # ================== 快乐8智能预测展示 ==================
 def render_prediction_page():
-    st.markdown("## 🔮 快乐8 智能预测")
+    st.markdown("## 🎱 快乐8 智能预测")
     df_pred = load_predictions()
     if df_pred.empty:
         st.info("暂无预测数据，请等待后台生成。")
