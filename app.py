@@ -251,7 +251,7 @@ def render_lottery_card(title, issue, date_str, numbers, config):
     return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
 def render_all_latest():
-    st.markdown("## 🧧 彩富密码")
+    st.markdown("## 🧧 彩富密码⚿")
     
     # 使用北京时间
     now = get_beijing_time()
@@ -447,7 +447,7 @@ def render_prediction_page():
 def main():
     update_online_status()
     
-    st.sidebar.title("🎰 LOTTOX 彩票X")
+    st.sidebar.title("🎰 LOTTOX 乐透X")
     st.sidebar.markdown(
         f"""
         <div style="background-color:#f0f2f6; padding:6px; border-radius:8px; overflow:hidden; white-space:nowrap;">
