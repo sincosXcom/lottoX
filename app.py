@@ -412,7 +412,7 @@ def render_prediction_page():
                 subset = df_pred[(df_pred['model'] == model) & (df_pred['feature_mode'] == mode) & (df_pred['temperature'] == temp)]
                 if subset.empty:
                     continue
-                hist = subset.tail(5)
+                hist = subset.tail(8)
                 max_cols = 20
                 mode_name = "表格特征" if mode == "table" else "原始号码"
                 title_html = f'<div class="card-title" style="margin: 0.5rem 0 0.5rem 0; font-size: 1.4rem; font-weight: bold; color: #1e293b;">{model.upper()} - {mode_name} <span style="font-size: 0.9rem; font-weight: normal; color: #6c757d;">| 温度 {temp}</span></div>'
