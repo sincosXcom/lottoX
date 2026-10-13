@@ -250,6 +250,71 @@ def render_lottery_card(title, issue, date_str, numbers, config):
 '''
     return f'<div class="lottery-card">{header_html}{ball_container}</div>'
 
+
+# ================== 密歇根 Daily 3（独立处理，不走 LOTTERY_CONFIG） ==================
+@st.cache_data(ttl=3600)
+def load_michigan_latest():
+    """读取 pick3 工作表最新一行"""
+    try:
+        client = get_gsheet_client()
+        spreadsheet_id = st.secrets["google"]["spreadsheet_id"]
+        spreadsheet = client.open_by_key(spreadsheet_id)
+        worksheet = spreadsheet.worksheet("pick3")
+        all_data = worksheet.get_all_values()
+        if len(all_data) < 2:
+            return None
+        headers = all_data[0]
+        rows = all_data[1:]
+        df = pd.DataFrame(rows, columns=headers)
+        if "Date" not in df.columns:
+            return None
+        df = df.sort_values("Date", ascending=True).reset_index(drop=True)
+        return df.iloc[-1].to_dict()
+    except Exception:
+        return None
+
+def render_michigan_card():
+    """渲染密歇根 Daily 3 最新一期卡片（Midday + Evening 两期）"""
+    row = load_michigan_latest()
+    if not row:
+        return
+    date_str = row.get("Date", "")
+    mid = str(row.get("Midday", ""))
+    eve = str(row.get("Evening", ""))
+    mid_issue = row.get("mid_issue", "")
+    eve_issue = row.get("eve_issue", "")
+    week = row.get("Week", "")
+
+    def make_balls(nums, ball_class):
+        return "".join([f'<div class="number-ball {ball_class}">{d}</div>'
+                        for d in nums if d.isdigit()])
+
+    mid_balls = make_balls(mid, "red-ball")
+    eve_balls = make_balls(eve, "blue-ball")
+
+    card_html = f'''
+<div class="lottery-card">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+        <div>
+            <span class="card-title" style="font-size: 1.4rem; font-weight: bold; color: #1e293b;">密歇根 Daily 3</span>
+            <span style="margin-left: 8px;"></span>
+            <span style="font-size: 1.1rem; font-weight: 500; color: #1e293b;">{date_str}</span>
+            <span style="font-size: 0.85rem; color: #6c757d;"> | 星期{week}</span>
+        </div>
+        <span style="font-size: 0.8rem; color: #6c757d;">每天两期</span>
+    </div>
+    <div style="display: flex; align-items: center; margin-top: 6px;">
+        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Midday ({mid_issue})</span>
+        <div style="display: flex; gap: 6px;">{mid_balls}</div>
+    </div>
+    <div style="display: flex; align-items: center; margin-top: 8px;">
+        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Evening ({eve_issue})</span>
+        <div style="display: flex; gap: 6px;">{eve_balls}</div>
+    </div>
+</div>
+'''
+    st.markdown(card_html, unsafe_allow_html=True)
+
 def render_all_latest():
     st.markdown("## 🧧 彩富密码⚿")
     
@@ -334,6 +399,9 @@ def render_all_latest():
             nums, issue, date_str, cfg = data_map[name]
             card_html = render_lottery_card(name, issue, date_str, nums, cfg)
             st.markdown(card_html, unsafe_allow_html=True)
+
+    # 密歇根 Daily 3（显示在七星彩下方）
+    render_michigan_card()
     
     # 底部免责声明
     st.markdown('<div style="text-align: center; font-size: 0.9rem; color: #aaa; margin-top: 30px;">开奖信息仅供参考 最终以官方信息发布为准。</div>', unsafe_allow_html=True)
