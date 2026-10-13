@@ -304,12 +304,12 @@ def render_michigan_card():
         <span style="font-size: 0.8rem; color: #6c757d;">每天两期</span>
     </div>
     <div style="display: flex; align-items: center; margin-top: 6px;">
-        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Midday ({mid_issue})</span>
         <div style="display: flex; gap: 6px;">{mid_balls}</div>
+        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Midday ({mid_issue})</span>
     </div>
     <div style="display: flex; align-items: center; margin-top: 8px;">
-        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Evening ({eve_issue})</span>
         <div style="display: flex; gap: 6px;">{eve_balls}</div>
+        <span style="font-size: 0.95rem; color: #6c757d; min-width: 130px;">Evening ({eve_issue})</span>
     </div>
 </div>
 '''
